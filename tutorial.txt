@@ -1,0 +1,70 @@
+Tutorial: How to use the Timeliner audio browser.
+
+1. Playback.
+
+To hear the recording, hit the SPACEBAR.
+If you hit the spacebar again, playback stops.
+Try that now.
+
+To start listening midway through the recording,
+RIGHT-CLICK somewhere and then hit the spacebar.
+Try that now.
+
+To save you from too much clicking, you can also hold down the
+RIGHT mouse button and DRAG the mouse left or right.
+Try that now.
+
+2. Zooming.
+
+Timeliner can show you the whole recording, or (more usefully)
+just a part of it.  To zoom in, to see a part in greater detail,
+roll the mouse's SCROLL WHEEL forward.  To zoom out, roll it back.
+Try that now.
+
+3. Scrolling.
+
+To scroll the display left or right, hold down the LEFT button
+and DRAG the mouse left or right.
+
+4. Keyboard.
+
+If you use the mouse with your right hand, then your left hand can do all
+these things at the same time on the keyboard, without looking away from
+the screen.  Put your index finger on the D key.  The keys
+      W
+    A S D
+act like four arrow keys.  W and S zoom in and out.
+A and D scroll left and right.  Try those four keys now.
+
+5. Two-handed use.
+
+Zooming aims at WHERE the mouse is.
+For example, move the mouse near something that looks interesting.
+Then zoom in, to see detail around that interesting spot.
+This way, you can "aim" with the mouse and zoom with the other hand.
+Try that now.
+
+Now play around for a few minutes, to get the feel of using all of these:
+  - mouse
+  - mouse scroll-wheel
+  - "arrow" keys
+Explore what feels most natural to you.
+
+6. Interpreting what you see.
+
+As you zoom and scroll, the bottom part of the display may look familiar.
+The bright green "waveform" is like that of a traditional audio editor.
+
+Below that, an abstract timeline shows tick-marks labeled in seconds,
+minutes, or hours (s, m, h), or tens thereof (10s, 10m).
+
+Most of the screen, though, shows rectangles that are less familiar
+representations of audio.
+
+One display is a kind of spectrogram.  Brightness indicates loudness,
+with the rectangle's top indicating the highest sounds, and the bottom
+indicating the lowest.
+
+Other displays are more abstract.  What really matters is that if you
+see something unusual there, then that may be a clue that you'd hear
+something unusual there as well.
