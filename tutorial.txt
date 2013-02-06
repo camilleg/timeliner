@@ -38,8 +38,9 @@ A and D scroll left and right.  Try those four keys now.
 
 5. Two-handed use.
 
-Zooming aims at WHERE the mouse is.
-For example, move the mouse near something that looks interesting.
+Zooming aims at where the mouse is.
+For example, move the mouse near something interesting that's
+near the left or right edge of the screen.
 Then zoom in, to see detail around that interesting spot.
 This way, you can "aim" with the mouse and zoom with the other hand.
 Try that now.

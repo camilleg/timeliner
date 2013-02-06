@@ -64,6 +64,7 @@ def doEggs wav, wavInput, eggDir
   # Accumulate eggs at random offsets into a buffer.
   rawegged = Array.new((secEggMax*SR + sampEggLongest + 2).to_i, 0)	# 2 is chickenfactor (ha,ha).
   eggs = [] # Array of [start, end, which_egg, amplitude] tuples.  Start-end intervals will be disjoint.
+  srand 42  # Same sequence of rand for each run, just to reduce churn in the git repository.
   cegg.times {|iEgg|
     iEgg %= raweggs.size
     begin

@@ -7,6 +7,9 @@ OBJS = timeliner_run.o timeliner_cache.o alsa.o
 all: test
 
 clean:
+	rm -f timeliner_run $(OBJS) timeliner.log 
+# Windows might not yet be able to run ./timeliner_init.rb to create example/marshal/* .
+clean-for-linux:
 	rm -f timeliner_run $(OBJS) timeliner.log example/marshal/*
 
 .cpp.o:
