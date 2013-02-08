@@ -400,7 +400,7 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
       *pz++ = Float(j);
       for (unsigned _=0; _<width; ++_) {
 	*pz++ = zMin[_];
-	*pz++ = Float(zMean[_] / j);
+	*pz++ = Float(zMean[_] / SUB);
 	*pz++ = zMax[_];
       }
 
@@ -679,6 +679,7 @@ const CQuartet CHello::recurse(const vector<VD*>* const layers, const Float s, c
 // Return interleaved min and max.
 void CHello::getbatch(float* r, const double t0, const double t1, const unsigned cstep, const double dyMin) const
 {
+  assert(dyMin > 0.0);
   double t = t0;
 #if 0
   double tFail = -1.0;
@@ -709,6 +710,7 @@ void CHello::getbatch(float* r, const double t0, const double t1, const unsigned
       yMin = Float(yMid - dyMin);
       yMax = Float(yMid + dyMin);
     }
+    assert(yMax - yMin >= dyMin);
     *r++ = yMin;
     *r++ = yMax;
     t += dt;

@@ -1,6 +1,6 @@
 #include <vector>
 
-#include <assert.h>
+#include <cassert>
 #ifdef NDEBUG
 #define _unused(x) ((void)x)
 #endif

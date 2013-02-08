@@ -89,6 +89,7 @@ def doEggs wav, wavInput, eggDir
   rawegged.slice!(eggs[-1][1]*SR + 1, -1)		# Crop silence after last egg.
 
   info "mixing eggs"
+  info "Ignore sox's warning that the input file wasn't mono." if $channels != 1
   # works at 3 hours, but at 6 hours, OOM in pack 's*':
   IO.popen("sox -m    -v 0.1 -r #{SR} -s -2 -c 1 -t raw -    -v 1.0 #{wavInput}    #{wav}", "w+") {|f| f.puts rawegged.pack('s*')}
 
@@ -127,11 +128,18 @@ cfg.delete_if {|l| l =~ /\w+=\S+/ }
 
 quit "no input soundfile #$wavSrc" if !File.exist? $wavSrc
 wav = "#{dirMarshal}/mixed.wav"
+# aptitude install audiofile-tools
+$channels = `sfinfo #$wavSrc|grep channel`.split[0].to_i
 if $eggSrc
   $eggNames, $eggs = doEggs wav, $wavSrc, $eggSrc
 else
   # aptitude install libsox-fmt-mp3
-  `sox #$wavSrc -r #{SR} -s -2 -c 1 #{wav}`
+  if $channels == 1
+    `sox #$wavSrc -r #{SR} -s -2 -c 1 #{wav}`
+  else
+    info "Input soundfile #$wavSrc is multichannel (#$channels channels).  Experimental work ahead!"
+    `sox  #$wavSrc -r #{SR} -s -2 -c #$channels  #{wav}`
+  end
 end
 GC.start
 
@@ -149,12 +157,30 @@ if $eggSrc
 end
 
 info "reading wav"
-$wavS16 = `sox #{wav} -r #{SR} -s -2 -c 1 -t raw -`
-($wavS16.size % 2) .should == 0
-$wavcsamp = $wavS16.size / 2
+$wavS16 = `sox #{wav} -r #{SR} -s -2 -c #$channels -t raw -`
+($wavS16.size % (2 * $channels)) .should == 0
+$wavcsamp = $wavS16.size / (2 * $channels)
 quit "no wav file" if $wavcsamp == 0
-info "wav is #{$wavcsamp} samples, #{$wavcsamp / SR} seconds"
-info "wav uses #{($wavcsamp * 4 / 1000000.0).to_i} MB."
+info "wav has #{$wavcsamp} samples, #{$wavcsamp / SR} seconds, #{($wavcsamp * 4 / 1000000.0).to_i} MB."
+info "wav has #$channels channels" if $channels != 1
+if $channels == 1
+  $rawS16 = [$wavS16]
+else
+  # De-interleave the String $wavS16 into $channels parts, 2 chars (16 bits) at a time.
+  # This is http://en.wikipedia.org/wiki/In-place_matrix_transposition .
+  # Expensive and thrash-prone, thus better avoided by instead changing how memory is accessed.
+  if nil
+    # Too baroque
+    shorts = $wavS16 .bytes.to_a .map(&:chr) .each_slice(2).to_a .map(&:join)
+    (shorts.size * 2) .should == $wavS16.size
+    $rawS16 = shorts.each_slice($channels).to_a.transpose .map(&:join)
+  else
+    $rawS16 = $wavS16.unpack("s*").each_slice($channels).to_a.transpose .map{|a| a.pack("s*")}
+  end
+  $rawS16.size .should == $channels
+  $rawS16.each {|r| r.size .should == $wavcsamp * 2}
+end
+$wavS16 = nil
 
 def writeHTK outfile, rgData, sampPeriodHNSU
   rgData.empty? .should == false
@@ -163,7 +189,6 @@ def writeHTK outfile, rgData, sampPeriodHNSU
 end
 
 class Object
-  def to_proc() proc{|_,*args| _.send self,*args} end # For .map
   def linearize() self >= 1.0 ? -2e-9 : Math.log((1.0 - self) / (1.0 + self)) end
 end
 
@@ -178,7 +203,7 @@ def writeHTKFromQuicknet fileOut, fileIn, sampPeriodHNSU, vectorWidth, kind=0
 end
 
 requireGem 'gsl'
-def writeHTKWavelet fileOut, sampPeriodHNSU
+def writeHTKWavelet channel, fileOut, sampPeriodHNSU
   cSampWindow = 32
   w = GSL::Wavelet.alloc GSL::Wavelet::DAUBECHIES_CENTERED, 4
   workspace = GSL::Wavelet::Workspace.alloc cSampWindow
@@ -192,11 +217,11 @@ def writeHTKWavelet fileOut, sampPeriodHNSU
   h = hamming cSampWindow
 
   r = []
-  cSamp = $wavS16.size / 2
+  cSamp = $rawS16[channel].size / 2
   iSamp = 0.0
   while iSamp+cSampWindow < cSamp
     i = iSamp.to_i
-    data = $wavS16[i*2 ... (i+cSampWindow)*2].unpack('s*').to_gv
+    data = $rawS16[channel][i*2 ... (i+cSampWindow)*2].unpack('s*').to_gv
     data.size .should == h.size
     # Convolve data with Hamming window.
     h.each_with_index {|weight,i| data[i] *= weight }
@@ -206,8 +231,8 @@ def writeHTKWavelet fileOut, sampPeriodHNSU
   writeHTK fileOut, r, sampPeriodHNSU
 end
 
-def writeHTKOracle fileOut, sampPeriodHNSU
-  cSamp = $wavS16.size / 2
+def writeHTKOracle channel, fileOut, sampPeriodHNSU
+  cSamp = $rawS16[channel].size / 2
   sSamp = sampPeriodHNSU / 1e7
   cSampWindow = sSamp*SR
   # Each vector in r is 1 element long, the fraction of egged audio samples in that interval.
@@ -233,10 +258,10 @@ class Feature
       @data.packFastFloat
   end
 
-  def initialize icolormap, filename, name, option=nil, weightsFile=nil
+  def initialize channel, icolormap, filename, name, option=nil, weightsFile=nil
     @iColormap = icolormap
     fAlreadyHTK = @iColormap < 0
-    filename = htkFromWav @iColormap, filename, weightsFile, option if !fAlreadyHTK
+    filename = htkFromWav channel, @iColormap, filename, weightsFile, option if !fAlreadyHTK
     # icolormaps 0, 1, 2, 3, 4 mean filename is .wav, to convert to respectively FBANK_Z, MFCC_Z, ANN, wavelet, oracle.
     @name, @period, @vectorsize, @data = name, *readHTK(name, filename)
     if !fAlreadyHTK
@@ -277,19 +302,30 @@ class Feature
   @@Outfile = "/tmp/timeliner_htk"
   FeacatWidth = 78 # must be 1/5 of the value "390" which is somehow part of example/trainANN.wts
 
-  def htkFromWav iKind, infile, weightsFile, option=0
+  def htkFromWav channel, iKind, infile, weightsFile, option=0
+    # infile == ".../marshal/mixed.wav"
     return infile if iKind < 0 || iKind >= @@Config.size
 
     quit "Cannot make oracle feature without easter eggs" if iKind == 4 && !$eggSrc
 
     # Special cases.  Use GSL instead of HCopy.
-    return writeHTKWavelet @@Outfile, @@sampPeriod.to_f if iKind == 3
-    return writeHTKOracle  @@Outfile, @@sampPeriod.to_f if iKind == 4
+    return writeHTKWavelet channel, @@Outfile, @@sampPeriod.to_f if iKind == 3
+    return writeHTKOracle  channel, @@Outfile, @@sampPeriod.to_f if iKind == 4
 
     fileFromString @@Hcfg, @@ConfigCommon + @@Config[iKind]
-    `rm -rf #@@Outfile;
-     HCopy -A -T 1 -C #@@Hcfg #{infile} #@@Outfile;
-     rm -f #@@Hcfg`
+    `rm -rf #@@Outfile`
+    if $channels == 1
+      channel .should == 0
+      `HCopy -A -T 1 -C #@@Hcfg #{infile} #@@Outfile`
+    else
+      tmpfile = "/tmp/channeltmp.wav"
+      channelfile = "/tmp/channel.wav"
+      fileFromString tmpfile, $rawS16[channel]
+      `sox -t raw -r #{SR} -s -2 -c 1 #{tmpfile} #{channelfile};
+       HCopy -A -T 1 -C #@@Hcfg #{channelfile} #@@Outfile;
+       rm -f #{channelfile} #{tmpfile}`
+    end
+    `rm -f #@@Hcfg`
     if iKind == 2
       quit "config file line lacks .wts weights file" if !weightsFile
       quit "no ANN weights file #{weightsFile}" if !File.exist? weightsFile
@@ -320,12 +356,18 @@ class Feature
 
 end
 
-cfg .map!(&:split) .map! {|l| [l[0].to_i] + l[1..-1]}	# Parse each line's leading index.
-cfg .map! {|l| l[0]<0 ? l : [l[0], wav] + l[1..-1]}	# Insert 'wav' after nonnegative indices.
+cfg .map!(&:split) .map! {|l| [l[0].to_i] + l[1..-1]}			# Parse each line's leading index.
+cfg .map! {|l| l[0]<0 ? l : [l[0], wav] + l[1..-1]}			# Insert 'wav' after nonnegative indices.
 cfg .map! {|l| l.size <= 3 ? l : l[0..2] + [l[3].to_i] + l[4..-1]}	# Parse optional trailing int and weightsfile.
 
 FeatureFile = "features"
 `rm -rf #{dirMarshal}/#{FeatureFile}*`
-GC.start
-cfg.each_with_index {|l,i| marshal dirMarshal, "#{FeatureFile}#{i}", Feature.new(*l); GC.start}
+i = 0
+cfg.each {|l|
+  GC.start
+  $channels.times {|ch|
+    marshal dirMarshal, "#{FeatureFile}#{i}", Feature.new(*([ch]+l))
+    i += 1
+  }
+}
 info "Input files marshaled."

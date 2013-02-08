@@ -784,8 +784,10 @@ void drawFeatures()
   assert(features.size() < 100);
   int i=0;
   double sum = 0.0;
-  for (f=features.begin(); f!=features.end(); ++f)
+  for (f=features.begin(); f!=features.end(); ++f) {
     sum += rgdy[i++] = sqrt(double((*f)->vectorsize()));
+    assert(i < 100); //hardcoded;;
+  }
   // rgdy[0 .. i-1] are heights.
   double rgy[100]; //hardcoded;;
   rgy[0] = YTick*6.0;
@@ -853,31 +855,62 @@ double geometriclerp(double z, double min, double max)
   return r*r;
 }
 
+double scaleWavFromSampmax(double s)
+{
+  const double sMin = 25.0; // Threshold = 10 * log10(sMin^2 / 32768^2) = about -62 dB
+  if (s < sMin)
+    s = sMin;
+  return 0.98 * YTick*2 / s;
+}
+const double scaleWavDefault = scaleWavFromSampmax(32768.0);
+
+class WaveDraw {
+public:
+  double scaleWav;
+  double scaleWavAim;
+  const CHello* cacheWav;
+  WaveDraw(const CHello* p) : scaleWav(scaleWavDefault), scaleWavAim(scaleWavDefault), cacheWav(p)
+    { if (!p) quit("failed to cache wav"); }
+  void update()
+    {
+    // Asymmetric.  Grow slowly, shrink quickly.
+    // Slowly, but not so slow that it distracts while nothing else changes.
+    // Aim should complete within about 0.15 seconds.
+    //
+    // Copypaste.
+    double lowpass = 0.0345 * exp(67.0 * secsPerFrame) * (scaleWavAim > scaleWav ? 5.0 : 20.0);
+    // Disable aim/show at slow frame rates, to avoid flicker.
+    if (secsPerFrame > 1.0/30.0)
+      lowpass = 1.0;
+    if (lowpass > 1.0)
+      lowpass = 1.0;
+    const double lowpass1 = 1.0 - lowpass;
+    scaleWav = scaleWav*lowpass1 + scaleWavAim*lowpass;
+    }
+};
+
+std::vector<WaveDraw> wavedrawers;
+unsigned int channels = 0; // == wavedrawers.size()
+
 void drawWaveformScaled(const float* minmaxes, double yScale) {
-  const double ramp = (1.0/yScale - 5000.0) / (33100.0 - 5000.0) / 11.0; // 1.0 downto 0.009
-  glColor4d(linearlerp(ramp,0,0.1), linearlerp(ramp,0.08,1.0), linearlerp(ramp,0.1,0.15), 1.0);
+  // As yScale from default 331000. to zoomedin 5000.0,
+  // color from brightgreen 0.1,1.0,0.2 to cyan 0.0,0.25,0.3,
+  // roughly constant #pixels times brightness.
+  const double ramp = yScale==scaleWavDefault ? 1.0 :
+    (0.85/yScale - 5000.0) / (33100.0 - 5000.0) / 11.0; // 1.0 downto 0.009
+  glColor4d(linearlerp(ramp,0.07,0.1), geometriclerp(ramp,0.15,1.0), linearlerp(ramp,0.06,0.15), 1.0);
   glPushMatrix();
     glScaled(1.0/pixelSize[0], yScale, 1.0);
     glBegin(GL_LINES);
     for (int x = 0; x < pixelSize[0]; ++x) {
-      glVertex2f(GLfloat(x), minmaxes[x*2]);
-      glVertex2f(GLfloat(x), minmaxes[x*2+1]);
+      float y0 = minmaxes[x*2];
+      float y1 = minmaxes[x*2+1];
+      glVertex2f(GLfloat(x), y0);
+      glVertex2f(GLfloat(x), y1);
     }
     glEnd();
   glPopMatrix();
 }
-
-double scaleWavFromSampmax(double s)
-{
-  const double sMin = 500.0;
-  if (s < sMin)
-    s = sMin;
-  return 0.95 * YTick*2 / s;
-}
-const double scaleWavDefault = scaleWavFromSampmax(32768.0);
-double scaleWav = scaleWavDefault;
-double scaleWavAim = scaleWavDefault;
-CHello* cacheWav = NULL;
 
 void drawWaveform()
 {
@@ -888,30 +921,38 @@ void drawWaveform()
   // Convert x-pixel extent to [t,t+dt] from [t-dt/2, t+dt/2].  Edge-centered not body-centered, sort of.
   const double hack = (tShow[1] - tShow[0])*0.5 * (pixelSize[0] / (pixelSize[0]-1));
 
-  float dst[2];
-  assert(cacheWav);
-  cacheWav->getbatch(dst, tShow[0]+hack, tShow[1]+hack, 1, 0.0);
-  float& xmin = dst[0];
-  float& xmax = dst[1];
-  // [xmin.abs, xmax.abs].max is a shortcut for minmaxes.map{|x| x.abs}.max 
-  // 0.8 not 0.99, to hint that it's not really maximum amplitude.
-  scaleWavAim = scaleWavFromSampmax(max(abs(xmin), abs(xmax)));
+  const double YWavMax = features.empty() ? 1.0 : YTick*6.0;
+  const double heightPerChannel = (YWavMax-YTick*2.0)/channels;
+  const double yTweak = (YWavMax/2-YTick)/(YTick*2) /channels;
+  assert(channels == wavedrawers.size());
+  unsigned i=0;
+  for (vector<WaveDraw>::iterator it = wavedrawers.begin(); it != wavedrawers.end(); ++it,++i) {
+    float dst[2];
+    it->cacheWav->getbatch(dst, tShow[0]+hack, tShow[1]+hack, 1, 1.0/(scaleWavDefault * pixelSize[1]));
+    float& xmin = dst[0];
+    float& xmax = dst[1];
+    // [xmin.abs, xmax.abs].max is a shortcut for minmaxes.map{|x| x.abs}.max 
+    it->scaleWavAim = scaleWavFromSampmax(max(abs(xmin), abs(xmax)));
 
-  float minmaxes[6000*2]; // hardcoded
-  assert(6000 > pixelSize[0]);
-  cacheWav->getbatch(minmaxes, tShow[0], tShow[1], pixelSize[0], 1.0/(scaleWav * pixelSize[1]));
-  // Last arg avoids vanishingly short vertical lines.
+    glPushMatrix();
+      // The Y-extent of a monophonic waveform is YTick * [2..6].
+      // 0..1 height is then (YTick*6 - YTick*2)/2 = YTick*2.
+      // 0..1 height is then (YWavMax - YTick*2)/2 = YWavMax/2 - YTick
 
-  // As 1/scaleWav from default 331000. to zoomedin 5000.0,
-  // color from brightgreen 0.1,1.0,0.2 to cyan 0.0,0.25,0.3,
-  // roughly constant #pixels times brightness.
-
-  glPushMatrix();
-    glTranslated(0.0, YTick*4, 0.0);
-    // Scaled waveform is dark echo behind bright unscaled one.
-    drawWaveformScaled(minmaxes, scaleWav);
-    drawWaveformScaled(minmaxes, scaleWavDefault);
-  glPopMatrix();
+      // Draw channels from top to bottom.
+      const double centerOfChannel = YTick*2.0 + heightPerChannel*0.5 + (channels-1-i)*heightPerChannel;
+      glTranslated(0.0, centerOfChannel, 0.0);
+      glScaled(1.0, yTweak, 1.0);
+      // Scaled waveform is dark echo behind bright unscaled one.
+      // getbatch()'s last arg avoids vanishingly short vertical lines, which would render as a missing horizontal line.
+      float minmaxes[4000*2]; // 4000 hardcoded
+      assert(4000 > pixelSize[0]);
+      it->cacheWav->getbatch(minmaxes, tShow[0], tShow[1], pixelSize[0], 0.5/(it->scaleWav * pixelSize[1])/yTweak);
+      drawWaveformScaled(minmaxes, it->scaleWav);
+      it->cacheWav->getbatch(minmaxes, tShow[0], tShow[1], pixelSize[0], 0.5/(scaleWavDefault         * pixelSize[1])/yTweak);
+      drawWaveformScaled(minmaxes, scaleWavDefault);
+    glPopMatrix();
+  }
 }
 
 double sMouseRuler = 0.0;
@@ -1026,7 +1067,7 @@ void aim()
     lowpass = 1.0;
   if (lowpass > 1.0)
     lowpass = 1.0;
-  double lowpass1 = 1.0 - lowpass;
+  const double lowpass1 = 1.0 - lowpass;
   xyMouse[0] = xyMouse[0]*lowpass1 + xAim*lowpass;
   xyMouse[1] = xyMouse[1]*lowpass1 + yAim*lowpass;
 
@@ -1071,18 +1112,9 @@ void aim()
   tShowPrev[0] = tShow[0];
   tShowPrev[1] = tShow[1];
 
-  // Copypaste.
-  // Asymmetric.  Grow slowly, shrink quickly.
-  // Slowly, but not so slow that it distracts while nothing else changes.
-  // Aim should complete within about 0.15 seconds.
-  lowpass = 0.0345 * exp(67.0 * secsPerFrame) * (scaleWavAim > scaleWav ? 5.0 : 20.0);
-  // Disable aim/show at slow frame rates, to avoid flicker.
-  if (secsPerFrame > 1.0/30.0)
-    lowpass = 1.0;
-  if (lowpass > 1.0)
-    lowpass = 1.0;
-  lowpass1 = 1.0 - lowpass;
-  scaleWav = scaleWav*lowpass1 + scaleWavAim*lowpass;
+  for (vector<WaveDraw>::iterator it = wavedrawers.begin(); it != wavedrawers.end(); ++it) {
+    it->update();
+  }
 }
 
 // later, increase step for successive steps in same direction, resetting this after 0.5 seconds elapse.
@@ -1159,7 +1191,6 @@ void drawTimeline()
     glBindTexture(GL_TEXTURE_2D, texNoise);
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
     glPushMatrix();
-      const double YTick = 0.03;
       glScaled(1.0, YTick*2, 1.0);
       glBegin(GL_QUADS);
       for (i=0; i<diFew; ++i) {
@@ -1782,36 +1813,59 @@ int main(int argc, char** argv)
   SNDFILE* pf = sf_open(wav.c_str(), SFM_READ, &sfinfo);
   if (!pf) {
 #ifdef _MSC_VER
-	char buf[MAX_PATH];
-	(void)GetFullPathNameA(wav.c_str(), MAX_PATH, buf, NULL);
+    char buf[MAX_PATH];
+    (void)GetFullPathNameA(wav.c_str(), MAX_PATH, buf, NULL);
     quit(std::string("no wav file ") + std::string(buf));
 #else
-	quit("no wav file");
+    quit("no wav file");
 #endif
   }
   //printf("%ld frames, %d SR, %d channels, %x format, %d sections, %d seekable\n",
   //  long(sfinfo.frames), sfinfo.samplerate, sfinfo.channels, sfinfo.format, sfinfo.sections, sfinfo.seekable);
-  if (sfinfo.samplerate != SR || sfinfo.channels != 1 || sfinfo.format != (SF_FORMAT_WAV|SF_FORMAT_PCM_16))
+  if (sfinfo.samplerate != SR || sfinfo.format != (SF_FORMAT_WAV|SF_FORMAT_PCM_16))
     warn("wavfile has unexpected format");
   wavcsamp = long(sfinfo.frames);
-  wavS16 = new short[wavcsamp];
-  long cs = long(sf_read_short(pf, wavS16, wavcsamp));
+  channels = sfinfo.channels;
+  wavS16 = new short[wavcsamp * channels];
+  const long cs = long(sf_readf_short(pf, wavS16, wavcsamp));
   if (cs != wavcsamp)
     quit("failed to read wav");
   if (0 != sf_close(pf))
     warn("failed to close wav");
+
+  // Clever fast memory-conserving shortcut for monophonic.
+  short* channelS16 = channels==1 ? wavS16 : new short[wavcsamp];
   const double msec_resolution = 0.3;
   const double undersample = max(1.0, msec_resolution * 1e-3 * SR);
-  cacheWav = new CHello(wavS16, wavcsamp, float(SR), int(undersample), 1);
-  if (!cacheWav)
-    quit("failed to cache wav");
+  for (unsigned i=0; i<channels; ++i) {
+    if (channels != 1)
+      for (long j=0; j<wavcsamp; ++j)
+	channelS16[j] = wavS16[channels*j+i];
+    wavedrawers.push_back(WaveDraw(new CHello(channelS16, wavcsamp, float(SR), int(undersample), 1)));
+  }
+
+  if (channels != 1) {
+    // For now, just average all channels into monophonic audio playback.
+    // todo: instead, a weighted sum that attenuates very weak channels.
+    for (long j=0; j<wavcsamp; ++j) {
+      int z = 0;
+      for (unsigned i=0; i<channels; ++i) {
+	z += wavS16[channels*j+i];
+      }
+      channelS16[j] = short(z/channels);
+    }
+    // Swap pointers.  Delete the no-longer-needed longer multichannel array,
+    // and keep just the mixed-down monophonic array.
+    delete [] wavS16;
+    wavS16 = channelS16;
+  }
 
   tAim[0] = tShow[0] = tShowBound[0] = 0.0;
   tAim[1] = tShow[1] = tShowBound[1] = wavcsamp / double(SR);
 
   glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
   glutInitWindowSize(pixelSize[0], pixelSize[1]);
-  glutCreateWindow("FODAVA Timeliner");
+  glutCreateWindow("Timeliner");
   glutKeyboardFunc(keyboard);
   glutMouseFunc(mouse);
   glutMotionFunc(drag);

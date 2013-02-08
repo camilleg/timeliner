@@ -11,6 +11,7 @@
 # numchans indicates a filterbank's width and the number of MFCC's.
 
 wav=choral.wav
+# wav=../stereo/choral-stereo.wav
 egg=beeps
 numchans=100
 
