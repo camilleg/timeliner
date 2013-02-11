@@ -4,8 +4,8 @@ A browser for long audio recordings.
 
 # How to build and run Timeliner on Ubuntu 10.04 or 12.04
 
-`sudo apt-get install g++ freeglut3-dev gsl-bin libgsl0-dev libsndfile1-dev \
-ruby1.8 rubygems1.8 sox libxi-dev libxmu-dev libasound2-dev audiofile-tools`
+`sudo apt-get install g++ freeglut3-dev gsl-bin libgsl0-dev libsndfile1-dev \`
+`ruby1.8 rubygems1.8 sox libxi-dev libxmu-dev libasound2-dev audiofile-tools;`
 `sudo gem install gsl inline narray mmap rspec RubyInline`
 
 If `gem install gsl` fails as it did circa January 2013,
@@ -41,17 +41,17 @@ Install [freeglut](http://freeglut.sourceforge.net), using Visual Studio.
 Start Visual Studio.  In the Timeliner project, rightclick Properties.
 *   For Configuration, choose All Configurations.
     *   In VC++ Directories, add the Include Directory and Library Directory where you installed freeglut.
-    *   In VC++ Directories, add the Include Directory and Library Directory where you installed libsndfile.
-            (This is smarter than copying `*.lib` and `*.h` into the Timeliner project.)
+    *   In VC++ Directories, add the Include Directory and Library Directory where you installed libsndfile.  
+            (This is smarter than copying `*.lib` and `*.h` into the Timeliner project.)  
             (Beware the different directories `Program Files` and `Program Files (x86).`)
     *   In Debugging, for Command Arguments specify a marshal dir, e.g. `example\marshal`.
-    *   In Linker/Input, additional, prepend `dsound.lib;libsndfile-1.lib;opengl32.lib;freeglut_static.lib;`
+    *   In Linker/Input, additional, prepend `dsound.lib;libsndfile-1.lib;opengl32.lib;freeglut_static.lib;`.
 *   For Configuration, choose Debug.
     * In C/C++ Preprocessor, define `FREEGLUT_STATIC`.
-    * In C/C++, All Options, Runtime Library, choose multi-threaded debug (*no* DLL).
+    * In C/C++, All Options, Runtime Library, choose multi-threaded debug (no DLL).
 *   For Configuration, choose Release.
     * In C/C++ Preprocessor, define `FREEGLUT_STATIC`.
-    * In C/C++, All Options, Runtime Library, choose multi-threaded (*no* DLL).
+    * In C/C++, All Options, Runtime Library, choose multi-threaded (no DLL).
 
 Build the debug and/or release versions of Timeliner.
 Run Timeliner (with Ctrl+F5).
