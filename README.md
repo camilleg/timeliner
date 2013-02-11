@@ -2,42 +2,43 @@
 
 A browser for long audio recordings.
 
-# How to build and run Timeliner on Ubuntu 10.04 or 12.04.
+# How to build and run Timeliner on Ubuntu 10.04 or 12.04
 
-`sudo apt-get install g++ freeglut3-dev gsl-bin libgsl0-dev libsndfile1-dev ruby1.8 rubygems1.8 sox libxi-dev libxmu-dev libasound2-dev audiofile-tools`
+`sudo apt-get install g++ freeglut3-dev gsl-bin libgsl0-dev libsndfile1-dev \
+ruby1.8 rubygems1.8 sox libxi-dev libxmu-dev libasound2-dev audiofile-tools`
 `sudo gem install gsl inline narray mmap rspec RubyInline`
 
 If `gem install gsl` fails as it did circa January 2013,
 instead get the latest .tgz from [Rubyforge](http://rubyforge.org/frs/?group_id=285),
 and follow the `setup.rb` [instructions](http://rb-gsl.rubyforge.org/).
-You may even patch to the files it makes,
-according to github user [Oleksiy Kovyrin](https://gist.github.com/kovyrin/1217974):
+You may even need to patch the files it makes,
+according to [Oleksiy Kovyrin](https://gist.github.com/kovyrin/1217974):
 append `_with_eps` to `ext/matrix_complex.c`'s `gsl_matrix_complex_equal()`
 and to `ext/vector_complex.c`'s `gsl_vector_complex_equal()`.
 
 Install [HTK 3.4.1](http://htk.eng.cam.ac.uk).
 (To handle files larger than 2 GB on 64-bit Linux:
-after running HTK's ./configure, but before running its make,
-in all its subdiectories' Makefiles, remove -m32 from the CFLAGS definitions.)
+after running HTK's `./configure`, but before running `make`:
+in all of HTK's subdiectories' Makefiles, remove `-m32` from the `CFLAGS` definitions.)
 
 Install [QuickNet](http://www.icsi.berkeley.edu/Speech/qn.html).
 
 `make`
 
-# How to build Timeliner on Windows.
+# How to build Timeliner on Windows
 
 Install "Microsoft Visual Studio Express 2012 for Windows Desktop."
 - File, project, new, win32 (not x64), empty.
 - Add the source files `*.h` and `*.cpp`.
 
 Install [libsndfile](http://www.mega-nerd.com/libsndfile/#Download).
-(Use the 32-bit version, not the 64-bit.)
+Use the 32-bit version, not the 64-bit.
 
 Install [freeglut](http://freeglut.sourceforge.net), using Visual Studio.
 - Build all 4 configurations: debug and release, static and non-static.
 - Build them as x64 not Win32 (see the Configuration Manager).
 
-In the Timeliner project, rightclick Properties.
+Start Visual Studio.  In the Timeliner project, rightclick Properties.
 *   For Configuration, choose All Configurations.
     *   In VC++ Directories, add the Include Directory and Library Directory where you installed freeglut.
     *   In VC++ Directories, add the Include Directory and Library Directory where you installed libsndfile.
@@ -57,7 +58,7 @@ Run Timeliner (with Ctrl+F5).
 
 (Audio is built on RtAudio, which uses Windows' own DirectSound.)
 
-# How to adjust Timeliner.
+# How to adjust Timeliner
 
 Read Camille's paper [Effective Browsing of Long Audio Recordings](http://zx81.isl.uiuc.edu/camilleg/acmmm12.pdf).
 
