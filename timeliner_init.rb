@@ -31,71 +31,6 @@ include Math
 
 require 'timeliner_common'
 
-def doEggs wav, wavInput, eggDir
-  secEggMax = `sfinfo #{wavInput}|grep Duration|grep \ seconds`.split[1].to_f
-  quit "empty input soundfile #{wavInput}" if secEggMax <= 0.0
-  eggDir.chomp!
-  quit "no easter-egg directory called #{eggDir}" if !File.directory? eggDir
-  eggFiles = Dir.entries(eggDir)[2..-1]
-  quit "empty easter-egg directory #{eggDir}" if eggFiles.empty?
-  eggNames = eggFiles.select {|f| f =~ /.wav/} .map {|e| "#{eggDir}/#{e}" }
-  quit "no .wav files in easter-egg directory #{eggDir}" if eggNames.empty?
-  raweggs = [] # Array of arrays of s16 samples.
-  eggNames.each {|e|
-    # fails if e includes whitespace
-    info "parsing #{e}"
-    raweggs << `sox -V1 #{e} -r #{SR} -s -2 -c 1 -t raw - ` .unpack('s*')	# -V1 hides warnings of clipping.
-    raweggs[-1].size .should > 0
-  }
-  secEggShortest = raweggs.map {|e| e.size} .min / SR.to_f
-  sampEggLongest = raweggs.map {|e| e.size} .max
-  secEggMax -= sampEggLongest/SR.to_f
-  quit "Input soundfile #{wavInput} is shorter than one of the easter eggs, which lasts #{sampEggLongest/SR.to_f} seconds." if secEggMax < 0.0
-
-  info "normalizing eggs"
-  raweggs.map! {|e| m = 32767.0/e.max; e.map {|s| s*m}}
-
-  secPerEgg = [25.0, secEggMax/3.0].min
-  cegg = (secEggMax/secPerEgg).to_i
-  cegg .should > 0
-  info "adding #{cegg} eastereggs to #{wavInput}, yielding #{wav}"
-
-  info "laying eggs"
-  # Accumulate eggs at random offsets into a buffer.
-  rawegged = Array.new((secEggMax*SR + sampEggLongest + 2).to_i, 0)	# 2 is chickenfactor (ha,ha).
-  eggs = [] # Array of [start, end, which_egg, amplitude] tuples.  Start-end intervals will be disjoint.
-  srand 42  # Same sequence of rand for each run, just to reduce churn in the git repository.
-  cegg.times {|iEgg|
-    iEgg %= raweggs.size
-    begin
-      secDelay = rand * secEggMax
-      secDur = raweggs[iEgg].size.to_f/SR
-      secEnd = secDelay + secDur
-      # Forbid overlapping eggs.
-      # New egg [secDelay,secEnd] is [a,b].  Other eggs are [c,d].  Constrain b<c or d<a.
-      # Stronger: constrain egg to be at least secEggShortest away from other eggs,
-      # so subjects don't confuse one egg with two.
-    end until eggs.all? {|c,d,_| secEnd+secEggShortest<c || d<secDelay-secEggShortest}
-    sampleDelay = (secDelay * SR).to_i
-    ampl = 0.1 + 0.4 * rand
-    ampl = 0.9 if rand > 0.01			# A very few eggs are really loud.
-    raweggs[iEgg].each_with_index {|sample,i|
-      rawegged[sampleDelay+i] += sample * ampl
-    }
-    eggs << [secDelay, secEnd, iEgg, ampl]
-    # info "egg #{iEgg}" # "during seconds #{secDelay} to #{secEnd}"
-  }
-  eggs = eggs.sort_by {|secStart,*| secStart}
-  rawegged.slice!(eggs[-1][1]*SR + 1, -1)		# Crop silence after last egg.
-
-  info "mixing eggs"
-  info "Ignore sox's warning that the input file wasn't mono." if $channels != 1
-  # works at 3 hours, but at 6 hours, OOM in pack 's*':
-  IO.popen("sox -m    -v 0.1 -r #{SR} -s -2 -c 1 -t raw -    -v 1.0 #{wavInput}    #{wav}", "w+") {|f| f.puts rawegged.pack('s*')}
-
-  [eggNames, eggs]
-end
-
 quit "No HTK feature config file #{configfile}" if !File.exist? configfile
 cfg = File.readlines(configfile) .map &:strip		# Strip whitespace.
 cfg.delete_if {|l| l =~ /^#/ || l.empty? }		# Strip comments and blank lines.
@@ -110,10 +45,6 @@ cfg.each {|l|
       warn "Config file #{configfile}: duplicate wav" if $wavSrc
       $wavSrc = value
       info "Source audio is #$wavSrc."
-    when 'egg'
-      warn "Config file #{configfile}: duplicate egg" if $eggSrc
-      $eggSrc = value
-      info "Source egg dir is #$eggSrc."
     when 'numchans'
       $numchans = value.to_i
       info "Filterbank will have #$numchans channels."
@@ -123,38 +54,20 @@ cfg.each {|l|
   end
 }
 quit "Config file #{configfile}: no line 'wav=/foo/bar.wav'" if !$wavSrc
-info "Config file #{configfile}: no line 'egg=/foo/bar', thus no eggs will be made" if !$eggSrc
 cfg.delete_if {|l| l =~ /\w+=\S+/ }
 
 quit "no input soundfile #$wavSrc" if !File.exist? $wavSrc
 wav = "#{dirMarshal}/mixed.wav"
 # aptitude install audiofile-tools
 $channels = `sfinfo #$wavSrc|grep channel`.split[0].to_i
-if $eggSrc
-  $eggNames, $eggs = doEggs wav, $wavSrc, $eggSrc
+# aptitude install libsox-fmt-mp3
+if $channels == 1
+  `sox #$wavSrc -r #{SR} -s -2 -c 1 #{wav}`
 else
-  # aptitude install libsox-fmt-mp3
-  if $channels == 1
-    `sox #$wavSrc -r #{SR} -s -2 -c 1 #{wav}`
-  else
-    info "Input soundfile #$wavSrc is multichannel (#$channels channels).  Experimental work ahead!"
-    `sox  #$wavSrc -r #{SR} -s -2 -c #$channels  #{wav}`
-  end
+  info "Input soundfile #$wavSrc is multichannel (#$channels channels)."
+  `sox  #$wavSrc -r #{SR} -s -2 -c #$channels  #{wav}`
 end
 GC.start
-
-if $eggSrc
-  # marshal dirMarshal, 'eggs', [$eggNames, $eggs]
-  info "marshaling eggs, but C-compatibly"
-  Dir.chdir(dirMarshal) do
-    open('eggs', 'w') {|f|
-      f.puts $eggNames.size
-      $eggNames.each {|e| f.puts e}
-      f.puts $eggs.size
-      $eggs.each {|e| f.puts e.join(' ')}
-    }
-  end
-end
 
 info "reading wav"
 $wavS16 = `sox #{wav} -r #{SR} -s -2 -c #$channels -t raw -`
@@ -210,7 +123,7 @@ def writeHTKWavelet channel, fileOut, sampPeriodHNSU
   info "wavelet window is #{cSampWindow.to_f / SR * 1000.0} msec."
   sSamp = sampPeriodHNSU / 1e7
   stride = sSamp * SR
-  #info "wavelet stride is #{stride} sec, possibly not an exact integer."
+  #info "wavelet stride is #{stride.to_f/SR * 1000.0 } msec."
   warn "wavelet window #{cSampWindow} is shorter than stride #{stride}, causing some data to be ignored." if cSampWindow < stride
 
   def hamming(w) Array.new(w) {|n|  0.54 - 0.46 * cos(2.0*PI*n / (w-1.0)) } end
@@ -231,20 +144,6 @@ def writeHTKWavelet channel, fileOut, sampPeriodHNSU
   writeHTK fileOut, r, sampPeriodHNSU
 end
 
-def writeHTKOracle channel, fileOut, sampPeriodHNSU
-  cSamp = $rawS16[channel].size / 2
-  sSamp = sampPeriodHNSU / 1e7
-  cSampWindow = sSamp*SR
-  # Each vector in r is 1 element long, the fraction of egged audio samples in that interval.
-  r = Array.new(cSamp/cSampWindow) {[0.0]}
-  $eggs.each {|sStart,sEnd,*|
-    ((sStart*SR).to_i ... (sEnd*SR).to_i) .each {|iSamp|
-      r[iSamp/cSampWindow][0] += 1/cSampWindow
-    }
-  }
-  writeHTK fileOut, r, sampPeriodHNSU
-end
-
 class Feature
   attr_reader :name, :vectorsize
 
@@ -262,7 +161,7 @@ class Feature
     @iColormap = icolormap
     fAlreadyHTK = @iColormap < 0
     filename = htkFromWav channel, @iColormap, filename, weightsFile, option if !fAlreadyHTK
-    # icolormaps 0, 1, 2, 3, 4 mean filename is .wav, to convert to respectively FBANK_Z, MFCC_Z, ANN, wavelet, oracle.
+    # icolormaps 0, 1, 2, 3 mean filename is .wav, to convert to respectively FBANK_Z, MFCC_Z, ANN, wavelet
     @name, @period, @vectorsize, @data = name, *readHTK(name, filename)
     if !fAlreadyHTK
       @name += [" raw", " loglin"][option] if option
@@ -294,8 +193,6 @@ class Feature
     ",
    "dummy for wavelets
     ",
-   "dummy for oracle
-    ",
   ]
 
   @@Hcfg = "/tmp/timeliner_hcopy.cfg"
@@ -306,11 +203,8 @@ class Feature
     # infile == ".../marshal/mixed.wav"
     return infile if iKind < 0 || iKind >= @@Config.size
 
-    quit "Cannot make oracle feature without easter eggs" if iKind == 4 && !$eggSrc
-
     # Special cases.  Use GSL instead of HCopy.
     return writeHTKWavelet channel, @@Outfile, @@sampPeriod.to_f if iKind == 3
-    return writeHTKOracle  channel, @@Outfile, @@sampPeriod.to_f if iKind == 4
 
     fileFromString @@Hcfg, @@ConfigCommon + @@Config[iKind]
     `rm -rf #@@Outfile`

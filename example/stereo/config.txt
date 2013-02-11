@@ -1,5 +1,5 @@
 # Each line starts with a number. -1 means prebuilt htk file.  Others mean compute an htk file:
-# 0 filterbank, 1 mel-frequency cepstral coefficients, 2 ann, 3 wavelet, 4 easter-egg oracle.
+# 0 filterbank, 1 mel-frequency cepstral coefficients, 2 ann, 3 wavelet.
 #
 # Then, if -1, a filename.
 # Then, a label ("ExampleFilterbank").

@@ -1,3 +1,4 @@
+Debug=true
 if Debug
   def quit(_) $stdout.puts "#$0 ABORT: #{_}\n\n"; exit 1; end
   def warn(_) $stdout.puts "#$0 WARN: #{_}\n" end

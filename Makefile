@@ -8,9 +8,9 @@ all: teststereo
 
 clean:
 	rm -f timeliner_run $(OBJS) timeliner.log 
-# Windows might not yet be able to run ./timeliner_init.rb to create example/eggs/marshal/* .
+# Windows might not yet be able to run ./timeliner_init.rb to create example/mono/marshal/* .
 clean-for-linux:
-	rm -f timeliner_run $(OBJS) timeliner.log example/eggs/marshal/*
+	rm -f timeliner_run $(OBJS) timeliner.log example/mono/marshal/*
 
 .cpp.o:
 	g++ $(CFLAGS) -c $<
@@ -21,10 +21,10 @@ timeliner_cache.o: $(HDRS)
 timeliner_run: $(OBJS)
 	g++ $(CFLAGS) -o $@ $(OBJS) $(LIBS)
 
-test: timeliner_run Makefile example/eggs/marshal/mixed.wav
-	export ALSA_CARD=0 && ./timeliner_run example/eggs/marshal
-example/eggs/marshal/mixed.wav: timeliner_init.rb example/eggs/choral.wav example/eggs/beeps example/eggs/config.txt
-	cd example && ../timeliner_init.rb eggs/marshal eggs/config.txt
+test: timeliner_run Makefile example/mono/marshal/mixed.wav
+	export ALSA_CARD=0 && ./timeliner_run example/mono/marshal
+example/mono/marshal/mixed.wav: timeliner_init.rb example/mono/choral.wav example/mono/config.txt
+	cd example && ../timeliner_init.rb mono/marshal mono/config.txt
 
 teststereo: timeliner_run Makefile example/stereo/marshal/mixed.wav
 	export ALSA_CARD=0 && ./timeliner_run example/stereo/marshal

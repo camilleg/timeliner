@@ -1227,51 +1227,6 @@ double xyPanPrev[2] = {0.0, 0.0};
 inline double xFromMouse(double xM) { return       xM/pixelSize[0]; }
 inline double yFromMouse(double yM) { return 1.0 - yM/pixelSize[1]; }
 
-class Egg {
-public:
-  double secDelay;
-  double secEnd;
-  int iEgg;
-  double ampl;
-#ifdef DEBUG
-  const char* dump() const {
-    static char _[1000];
-    snprintf(_, 1000, "%lf %lf %d %lf", secDelay, secEnd, iEgg, ampl);
-    return _;
-  }
-#endif
-};
-
-vector<Egg> eggs;
-vector<char*> eggNames;
-vector<double> eggsFound;
-
-int eggsFind(double t)
-{
-  for (unsigned i = 0; i < eggs.size(); ++i) {
-    Egg& e = eggs[i];
-    if (t < e.secDelay)
-      return -1;
-    if (t <= e.secEnd)
-      return i;
-  }
-  return -1;
-}
-
-int numEggsFound()
-{
-  int c = 0;
-  for (unsigned i = 0; i < eggsFound.size(); ++i)
-    if (eggsFound[i] >= 0.0)
-      ++c;
-  return c;
-}
-
-const char* whenEggsFound()
-{
-  return "";
-}
-
 int itagShow = 0;
 double rgtagShow[90000]; // buffer overflow
 
@@ -1303,7 +1258,6 @@ void keyboard(unsigned char key, int x, int /*y*/)
   double sTag = s2s.sPlayCursors(rgs) ? rgs[0] : sMouseRuler;
   if (sTag < 0.0)
     sTag = 0.0;
-  static double eggsUndo[3] = {-1,-1,-1}; // iEgg, eggsFound[iEgg], sTag
 
   switch(key) {
     case 3: // ctrl+C
@@ -1311,52 +1265,6 @@ void keyboard(unsigned char key, int x, int /*y*/)
       snooze(0.6); // let other threads notice vfQuit
       delete applog;
       exit(0);
-    case 'q':
-      {
-	if (eggs.empty())
-	  break;
-	const int iEgg = int(eggsUndo[0]);
-	if (iEgg >= 0) {
-	  sTag = eggsUndo[2];
-	  if (!onscreen(sTag)) {
-	    break;
-	  }
-	  eggsFound[iEgg] = eggsUndo[1];
-	  eggsUndo[0] = -1;
-	  eggsUndo[1] = -1;
-	  eggsUndo[2] = -1;
-	  if (itagShow > 0)
-	    --itagShow;
-	}
-	else if (itagShow > 0) {
-	  // Flash at the line that will get erased.
-	  sTag = rgtagShow[itagShow-- - 1];
-	  if (!onscreen(sTag)) {
-	    ++itagShow;
-	    break;
-	  }
-	} else {
-	  // Nothing left to undo.
-	  sTag = -1.0;
-	}
-	flashTag.blink(sTag, 0.2f, 0.5f, 1.0f);
-      }
-      break;
-    case 'e':
-      {
-	if (eggs.empty())
-	  break;
-	rgtagShow[itagShow++] = sTag;
-	const int i = eggsFind(sTag);
-	if (i >= 0) {
-	  eggsUndo[0] = double(i);
-	  eggsUndo[1] = eggsFound[i];
-	  eggsUndo[2] = sTag;
-	  eggsFound[i] = appnow();
-	}
-	flashTag.blink(sTag, 0.9f, 1.0f, 1.0f);
-      }
-      break;
     case ' ':
       // Snap offscreen cursor back onscreen,
       // because subjects twitch-game rather than constructing deep subplans.
@@ -1738,49 +1646,6 @@ void* samplewriter(void*)
 
 const char* dirMarshal = ".timeliner_marshal";
 
-void readEggs()
-{
-  const string eggfile(dirMarshal + string("/eggs"));
-  FILE* pf = fopen(eggfile.c_str(), "r");
-  if (!pf) {
-    info("no file dirMarshal/eggs");
-    return;
-  }
-
-  unsigned ceggNames = 0;
-  if (1 != fscanf(pf, "%u", &ceggNames))
-    quit("dirMarshal/eggs syntax error");
-  if (ceggNames <= 0)
-    quit("dirMarshal/eggs nonpositive number of eggnames");
-  eggNames.reserve(ceggNames);
-
-  unsigned i;
-  for (i=0; i<ceggNames; ++i) {
-    char* s = new char[200];
-    if (1 != fscanf(pf, "%s", s))
-      quit("dirMarshal/eggs syntax error");
-    eggNames.push_back(s);
-  }
-  assert(eggNames.size() == ceggNames);
-
-  unsigned ceggs = 0;
-  if (1 != fscanf(pf, "%u", &ceggs))
-    quit("dirMarshal/eggs syntax error");
-  if (ceggs <= 0)
-    quit("dirMarshal/eggs nonpositive number of eggs");
-  eggs.reserve(ceggs);
-  eggsFound.reserve(ceggs);
-
-  for (i=0; i<ceggs; ++i) {
-    Egg e;
-    if (4 != fscanf(pf, "%lf %lf %d %lf", &e.secDelay, &e.secEnd, &e.iEgg, &e.ampl))
-      quit("dirMarshal/eggs syntax error");
-    eggs.push_back(e);
-    eggsFound.push_back(-1.0);
-  }
-  assert(eggs.size() == ceggs);
-}
-
 int main(int argc, char** argv)
 {
   testConverters();
@@ -1803,8 +1668,6 @@ int main(int argc, char** argv)
   if (argc == 3)
     logfilename = argv[2];
   applog = new Logger(logfilename);
-
-  readEggs();
 
   const string wav(dirMarshal + string("/mixed.wav"));
   // www.mega-nerd.com/libsndfile/api.html

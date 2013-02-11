@@ -49,15 +49,7 @@
 
 (Audio is built on RtAudio, which uses Windows' own DirectSound.)
 
-3. How to replicate the "easter egg" experiments with larger data sets.
-
-    100 hours of meeting-room audio (and video) is at http://corpus.amiproject.org/ .
-
-    To extract .wav files from your own audio CD's, use the Linux command: cdparanoia -B
-
-    Short clips useful as easter eggs are at http://www.findsounds.com/types.html .
-
-4. How to adjust Timeliner.
+3. How to adjust Timeliner.
 
     Read the paper "Effective Browsing of Long Audio Recordings" by Camille Goudeseune,
     http://zx81.isl.uiuc.edu/camilleg/acmmm12.pdf .
