@@ -21,12 +21,12 @@ timeliner_cache.o: $(HDRS)
 timeliner_run: $(OBJS)
 	g++ $(CFLAGS) -o $@ $(OBJS) $(LIBS)
 
-test: timeliner_run Makefile example/mono/marshal/mixed.wav
-	export ALSA_CARD=0 && ./timeliner_run example/mono/marshal
-example/mono/marshal/mixed.wav: timeliner_init.rb example/mono/choral.wav example/mono/config.txt
-	cd example && ../timeliner_init.rb mono/marshal mono/config.txt
-
 teststereo: timeliner_run Makefile example/stereo/marshal/mixed.wav
 	export ALSA_CARD=0 && ./timeliner_run example/stereo/marshal
 example/stereo/marshal/mixed.wav: timeliner_init.rb example/stereo/choral-stereo.wav example/stereo/config.txt
 	cd example && ../timeliner_init.rb stereo/marshal stereo/config.txt
+
+testmono: timeliner_run Makefile example/mono/marshal/mixed.wav
+	export ALSA_CARD=0 && ./timeliner_run example/mono/marshal
+example/mono/marshal/mixed.wav: timeliner_init.rb example/mono/choral.wav example/mono/config.txt
+	cd example && ../timeliner_init.rb mono/marshal mono/config.txt
