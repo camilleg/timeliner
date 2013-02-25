@@ -16,6 +16,7 @@
 #include <fstream>
 
 #ifdef _MSC_VER
+#define NOMINMAX // Don't #define min and max in windows.h, so std::min works.
 #include <windows.h>
 #include <time.h>
 #include <iostream>
@@ -29,7 +30,9 @@
 #include <unistd.h>
 #endif
 
-#include <sndfile.h> // aptitude install libsndfile1-dev, or www.mega-nerd.com/libsndfile/ libsndfile-1.0.25-w64-setup.exe
+// Linux:   aptitude install libsndfile1-dev
+// Windows: www.mega-nerd.com/libsndfile/ libsndfile-1.0.25-w64-setup.exe
+#include <sndfile.h>
 #include <vector>
 
 #include <GL/glut.h>
@@ -211,28 +214,28 @@ public:
 	  // success
       return;
     if (e == ERROR_ALREADY_EXISTS) {
-      cerr << "arLock warning: CreateMutex('" << name <<
+      std::cerr << "arLock warning: CreateMutex('" << name <<
         "') failed (already exists).\n";
       return;
     }
     if (e == ERROR_ACCESS_DENIED) {
-      cerr << "arLock warning: CreateMutex('" << name <<
+      std::cerr << "arLock warning: CreateMutex('" << name <<
         "') failed (access denied); backing off.\n";
 LBackoff:
       // _mutex = OpenMutex(SYNCHRONIZE, FALSE, name);
       // Fall back to a mutex of scope "app" not "the entire PC".
       _mutex = CreateMutex(NULL, FALSE, NULL);
       if (!_mutex) {
-        cerr << "arLock warning: failed to create mutex.\n";
+        std::cerr << "arLock warning: failed to create mutex.\n";
       }
     }
     else if (e == ERROR_PATH_NOT_FOUND) {
-      cerr << "arLock warning: CreateMutex('" << name <<
+      std::cerr << "arLock warning: CreateMutex('" << name <<
         "') failed (backslash?); backing off.\n";
       goto LBackoff;
     }
     else {
-      cerr << "arLock warning: CreateMutex('" << name <<
+      std::cerr << "arLock warning: CreateMutex('" << name <<
         "') failed; backing off.\n";
       goto LBackoff;
     }
@@ -858,7 +861,6 @@ void drawWaveform()
     it->cacheWav->getbatch(dst, tShow[0]+hack, tShow[1]+hack, 1, 1.0/(scaleWavDefault * pixelSize[1]));
     float& xmin = dst[0];
     float& xmax = dst[1];
-    // [xmin.abs, xmax.abs].max is a shortcut for minmaxes.map{|x| x.abs}.max 
     it->scaleWavAim = scaleWavFromSampmax(std::max(abs(xmin), abs(xmax)));
 
     glPushMatrix();

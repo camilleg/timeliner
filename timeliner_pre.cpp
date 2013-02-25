@@ -8,7 +8,6 @@
 #include "timeliner_diagnostics.h"
 
 #include <algorithm> 
-#include <arpa/inet.h> // ntohl(), etc
 #include <cassert>
 #include <cerrno>
 #include <cfloat>
@@ -17,15 +16,23 @@
 #include <cstring>
 #include <fcntl.h>
 #include <fstream>
-#include <gsl/gsl_wavelet.h>
 #include <iostream>
 #include <sstream>
 #include <vector>
 
 #ifdef _MSC_VER
+#define NOMINMAX // Don't #define min and max in windows.h, so std::min works.
 #include <windows.h>
 #include <time.h>
+#include <functional>			// not1
+#include <cctype>				// isspace (NOT <locale>, so it works with std::ptr_fun)
+#include <direct.h>				// _getcwd
+#define getcwd(a,b) _getcwd(a,b)
+#define mkdir(a,b)  _mkdir(a)
+#define chdir(a)    _chdir(a)
 #else
+#include <arpa/inet.h> // ntohl(), etc
+#include <gsl/gsl_wavelet.h>
 #include <pthread.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
@@ -69,6 +76,9 @@ void fileFromBufs(const std::string& outfilename, const char* pb, const long cb,
 short** rawS16 = NULL;
 long wavcsamp = -1;
 
+#ifndef M_PI
+#define M_PI (3.1415926535898)
+#endif
 double* hamming(int w) {
   double* a = new double[w];
   for (int n=0; n<w; ++n)
@@ -80,7 +90,7 @@ double* hamming(int w) {
 std::string writeHTK(const std::string& outfile, float* rgz, const long cz, const unsigned floatsPerSlice, const float sampPeriodHNSU) {
   if (cz <= 0)
     quit("refused to write HTK file with no data");
-  for (unsigned i=0; i<cz; ++i) {
+  for (int i=0; i<cz; ++i) {
     unsigned* pw = reinterpret_cast<unsigned*>(rgz+i);
     *pw = htonl(*pw);
   }
@@ -96,6 +106,10 @@ std::string writeHTK(const std::string& outfile, float* rgz, const long cz, cons
 }
 
 std::string writeHTKWavelet(const int channel, const std::string& fileOut, const float sampPeriodHNSU) {
+#ifdef _MSC_VER
+	warn("wavelets nyi in Windows, because the port of GNU GSL is ancient and unmaintained.");
+	return fileOut;
+#else
   const unsigned cSampWindow = 32;
   gsl_wavelet* w = gsl_wavelet_alloc(gsl_wavelet_daubechies_centered, 4);
   gsl_wavelet_workspace* workspace = gsl_wavelet_workspace_alloc(cSampWindow);
@@ -133,6 +147,7 @@ std::string writeHTKWavelet(const int channel, const std::string& fileOut, const
   const std::string s = writeHTK(fileOut, r, iz, cSampWindow, sampPeriodHNSU);
   delete [] r;
   return s;
+#endif
 }
 
 int channels = 1;  // mono, stereo, etc
@@ -170,7 +185,7 @@ std::string htkFromWav(const int channel, const int iKind, const std::string& in
     "TARGETKIND = FBANK_D_A_Z\n"
   };
   fileFromString(Hcfg, ConfigCommon + Config[iKind]);
-  (void)unlink(Outfile.c_str()); // Mere paranoia.  The file really shouldn't be there.
+  (void)remove(Outfile.c_str()); // Mere paranoia.  The file really shouldn't be there.
 
   const std::string channelfile = "/tmp/channel.wav";
 
@@ -196,9 +211,9 @@ std::string htkFromWav(const int channel, const int iKind, const std::string& in
 
   if (-1 == system(("HCopy -A -T 1 -C " + Hcfg + " " + channelfile + " " + Outfile).c_str()))
     quit("system() failed");
-  if (0 != unlink(channelfile.c_str()))
+  if (0 != remove(channelfile.c_str()))
     quit("failed to remove " + channelfile);
-  if (0 != unlink(Hcfg.c_str()))
+  if (0 != remove(Hcfg.c_str()))
     quit("failed to remove " + Hcfg);
 
   return Outfile;
@@ -247,7 +262,7 @@ void readHTK(const std::string& caption, const std::string& filename,
   delete foo;
   // ;; from start of function to here, move into a separate function so foo needn't be a pointer?
 
-  const long secs = nsamps*period_hnsu / 1e7;
+  const long secs = long(nsamps*period_hnsu / 1e7);
   const unsigned di = bytesPerSamp/4;
   info("sample kind " + parmkind_name[parmkind_base] + parmkind_qualifiers);
   info(itoa(nsamps) + " samples == " + itoa(secs) + " sec, " + itoa(period_hnsu) + " hnsu, " + itoa(di) + " floats/sample.");
@@ -273,7 +288,7 @@ void readHTK(const std::string& caption, const std::string& filename,
   // Spectrograms (.fb filterbanks) are conventionally black on white, not white on black.
   if (filename.find("fb") != std::string::npos) {
     for (i=0; i<cz; ++i)
-      data[i] = 1.0 - data[i];
+      data[i] = 1.0f - data[i];
   }
 
   period = period_hnsu/1e7;
@@ -297,7 +312,7 @@ public:
     std::cout << "Constructing feature from channel " << channel << " of kind " << iColormap << " with caption " << caption << "\n";
     const std::string htkFilename = htkFromWav(channel, m_iColormap, filename);
     readHTK(caption, htkFilename, m_period, m_vectorsize, m_data, m_cz);
-    if (0 != unlink(htkFilename.c_str()))
+    if (0 != remove(htkFilename.c_str()))
       warn("failed to remove " + htkFilename);
   }
   // Caller must delete[] pb and pz.
@@ -310,10 +325,10 @@ public:
     (void)strncpy(pb, m_name.c_str(), cb);
     cz = 4 + m_cz;
     pz = new float[cz];
-    pz[0] = m_iColormap;
-    pz[1] = m_period;
+    pz[0] = float(m_iColormap);
+    pz[1] = float(m_period);
     pz[2] = float(m_cz) / m_vectorsize;
-    pz[3] = m_vectorsize;
+    pz[3] = float(m_vectorsize);
     memcpy(pz+4, m_data, m_cz * sizeof(float));
   }
 };
@@ -378,15 +393,15 @@ int main(int argc, char** argv)
       return -1;
   }
 
-  const std::string dirOriginal(get_current_dir_name());
+  const std::string dirOriginal(getcwd(NULL, 0));
   if (chdir(dirMarshal.c_str()) != 0) {
     if (mkdir(dirMarshal.c_str(), S_IRWXU|S_IRGRP|S_IROTH) != 0) {
-      quit("failed to make subdirectory " + dirMarshal + " in directory " + get_current_dir_name());
+      quit("failed to make subdirectory " + dirMarshal + " in directory " + getcwd(NULL, 0));
     }
     if (chdir(dirMarshal.c_str()) != 0)
       quit("failed to chdir to marshal dir, moments after making it");
   }
-  dirMarshal = get_current_dir_name(); // Fully qualify.
+  dirMarshal = getcwd(NULL, 0); // Fully qualify.
   if (chdir(dirOriginal.c_str()) != 0) {
     quit("failed to chdir to starting directory " + dirOriginal);
   }
@@ -459,7 +474,7 @@ int main(int argc, char** argv)
   if (-1 == system(("cp " + wavSrc + " " + dirMarshal + "/mixed.wav").c_str()))
     quit("system() failed");
   info("reading " + wavSrc);
-  wavcsamp = sfinfo.frames;
+  wavcsamp = long(sfinfo.frames);
   channels = sfinfo.channels;
   short* wavS16 = new short[wavcsamp * channels];
   const long cs = long(sf_readf_short(pf, wavS16, wavcsamp));

@@ -1,3 +1,8 @@
+#ifdef _MSC_VER
+#define NOMINMAX // Don't #define min and max in windows.h, so std::min works.
+#include <windows.h>
+#endif
+
 class Mmap {
   char* _pch;
 #ifdef _MSC_VER

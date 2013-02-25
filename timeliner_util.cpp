@@ -1,9 +1,7 @@
 #include <string>
 #include <fcntl.h>
 
-#ifdef _MSC_VER
-//? #include <windows.h>
-#else
+#ifndef _MSC_VER
 #include <sys/mman.h>
 #include <sys/stat.h>
 #endif
@@ -13,7 +11,7 @@
 
 #ifdef _MSC_VER
 
-Mmap::Mmap(const string& szFilename, bool fOptional) : _pch(NULL) {
+Mmap::Mmap(const std::string& szFilename, const bool fOptional) : _pch(NULL) {
     h = CreateFile( std::wstring(szFilename.begin(), szFilename.end()).c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (h == INVALID_HANDLE_VALUE) {
       if (!fOptional)

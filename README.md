@@ -29,22 +29,16 @@ Install [freeglut](http://freeglut.sourceforge.net), using Visual Studio.
 - Build all 4 configurations: debug and release, static and non-static.
 - Build them as x64 not Win32 (see the Configuration Manager).
 
-Start Visual Studio.  In the Timeliner project, rightclick Properties.
+Start Visual Studio.  Open timeliner\timeliner.sln.
+In each of the two projects within that solution, rightclick Properties;
 *   For Configuration, choose All Configurations.
-    *   In VC++ Directories, add the Include Directory and Library Directory where you installed freeglut.
-    *   In VC++ Directories, add the Include Directory and Library Directory where you installed libsndfile.  
+    *   In VC++ Directories, adjust the Include Directory and Library Directory to where you installed freeglut.
+    *   In VC++ Directories, add the Include Directory and Library Directory to where you installed libsndfile.  
             (This is smarter than copying `*.lib` and `*.h` into the Timeliner project.)  
             (Beware the different directories `Program Files` and `Program Files (x86)`.)
     *   In Debugging, for Command Arguments specify a marshal dir, e.g. `example\marshal`.
-    *   In Linker/Input, additional, prepend `dsound.lib;libsndfile-1.lib;opengl32.lib;freeglut_static.lib;`.
-*   For Configuration, choose Debug.
-    * In C/C++ Preprocessor, define `FREEGLUT_STATIC`.
-    * In C/C++, All Options, Runtime Library, choose multi-threaded debug (no DLL).
-*   For Configuration, choose Release.
-    * In C/C++ Preprocessor, define `FREEGLUT_STATIC`.
-    * In C/C++, All Options, Runtime Library, choose multi-threaded (no DLL).
 
-Build the debug and/or release versions of Timeliner.
+Build the debug and/or release versions of timeliner_run and timeliner_pre.
 Run Timeliner (with Ctrl+F5).
 
 (Audio is built on RtAudio, which uses Windows' own DirectSound.)

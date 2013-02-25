@@ -5,11 +5,14 @@
 *.pdb
 *.idb
 *.ilk
-*.sln
 *.sdf
 *.suo
 *.exe
 *.lastbuildstate
+*.CppClean.log
+*.vcxproj
+*.vcxproj.user
+*.vcxproj.filters
 timeliner.log
 timeliner_run
 timeliner_pre
