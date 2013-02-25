@@ -15,36 +15,36 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\timeliner_cache.h">
+    <Text Include="ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="stdafx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\timeliner_common.h">
+    <ClInclude Include="targetver.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\timeliner_diagnostics.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\RtAudio.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\RtError.h">
-      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="stdafx.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="timeliner.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\timeliner_cache.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\timeliner_run.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\alsa.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\timeliner_cache.cpp">
+    <ClCompile Include="..\RtAudio.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\playsaw.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\RtAudio.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

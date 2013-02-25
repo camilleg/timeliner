@@ -1,5 +1,15 @@
 *.[oa]
 *~
+*.obj
+*.tlog
+*.pdb
+*.idb
+*.ilk
+*.sln
+*.sdf
+*.suo
+*.exe
+*.lastbuildstate
 timeliner.log
 timeliner_run
 timeliner_pre
