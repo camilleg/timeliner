@@ -12,18 +12,16 @@ Install [HTK 3.4.1](http://htk.eng.cam.ac.uk).
 after running HTK's `./configure`, but before running `make`:
 in all of HTK's subdiectories' Makefiles, remove `-m32` from the `CFLAGS` definitions.)
 
-Install [QuickNet](http://www.icsi.berkeley.edu/Speech/qn.html).
+Optionally install [QuickNet](http://www.icsi.berkeley.edu/Speech/qn.html).
 
 `make`
 
 # How to build Timeliner on Windows
 
-Install "Microsoft Visual Studio Express 2012 for Windows Desktop."
-- File, project, new, win32 (not x64), empty.
-- Add the source files `*.h` and `*.cpp`.
-
 Install [libsndfile](http://www.mega-nerd.com/libsndfile/#Download).
 Use the 32-bit version, not the 64-bit.
+
+Install "Microsoft Visual Studio Express 2012 for Windows Desktop."
 
 Install [freeglut](http://freeglut.sourceforge.net), using Visual Studio.
 - Build all 4 configurations: debug and release, static and non-static.
