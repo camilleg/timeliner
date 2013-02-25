@@ -10,7 +10,7 @@
 #
 # numchans indicates a filterbank's width and the number of MFCC's.
 
-wav=choral-stereo.wav
+wav=choral-stereo.wav		# example of a trailing comment
 numchans=30
 
 # Comment out next lines to verify that waveforms fill vertical extent when no derived features are specified.

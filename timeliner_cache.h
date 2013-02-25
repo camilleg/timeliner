@@ -6,7 +6,7 @@
 #endif
 
 typedef float Float;
-typedef vector<Float> VD;
+typedef std::vector<Float> VD;
 
 // todo: choose this at runtime from the HTK features loaded.
 const unsigned CQuartet_widthMax = 200; // 52 for filterbank, 62 for externally built saliency.  250 once made glTexImage1D fail with error 0x502.
@@ -125,12 +125,12 @@ public:
   const unsigned char* const getbatchTextureFromVector(const double t0, const double t1, const unsigned cstep, const int iColormap, const unsigned oversample) const;
 
 private:
-  vector<VD*>* layers;
+  std::vector<VD*>* layers;
   const bool fShrunkleaves;
   const Float hz;
   const unsigned width;
   const unsigned czNode;
   long cb;
 
-  const CQuartet recurse(const vector<VD*>* const layers, const Float s, const Float t, const int iLayer, const unsigned iz) const;
+  const CQuartet recurse(const std::vector<VD*>* const layers, const Float s, const Float t, const int iLayer, const unsigned iz) const;
 };

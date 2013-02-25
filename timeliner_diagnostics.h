@@ -1,18 +1,7 @@
-#include <iostream>
-#include <cstdlib>
 #include <string>
 
-const std::string appname = "timeliner";
+extern std::string appname;
 
-#define VERBOSE
-#ifdef VERBOSE
-void quit(const std::string& _) { std::cout << appname + " ABORT: " + _ +"\n\n"; exit(1); }
-void warn(const std::string& _) { std::cout << appname + " WARN: " + _ +"\n"; }
-void info(const std::string& _) { std::cout << appname + " info: " + _ +"\n"; }
-#else
-// Get user's attention: report only fatality.
-// They'll ignore more than one diagnostic.
-void quit(const std::string& _) { std::cout << appname + " ABORT: " + _ + "\n\n"; exit(1); }
-void warn(const std::string& _) { quit(_); }
-void info(const std::string& _) {}
-#endif
+void quit(const std::string&);
+void warn(const std::string&);
+void info(const std::string&);

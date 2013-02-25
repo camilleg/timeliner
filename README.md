@@ -5,16 +5,7 @@ A browser for long audio recordings.
 # How to build and run Timeliner on Ubuntu 10.04 or 12.04
 
 `sudo apt-get install g++ freeglut3-dev gsl-bin libgsl0-dev libsndfile1-dev \`
-`ruby1.8 rubygems1.8 sox libxi-dev libxmu-dev libasound2-dev audiofile-tools;`
-`sudo gem install gsl inline narray mmap rspec RubyInline`
-
-If `gem install gsl` fails as it did circa January 2013,
-instead get the latest .tgz from [Rubyforge](http://rubyforge.org/frs/?group_id=285),
-and follow the `setup.rb` [instructions](http://rb-gsl.rubyforge.org/).
-You may even need to patch the files it makes,
-according to [Oleksiy Kovyrin](https://gist.github.com/kovyrin/1217974):
-append `_with_eps` to `ext/matrix_complex.c`'s `gsl_matrix_complex_equal()`
-and to `ext/vector_complex.c`'s `gsl_vector_complex_equal()`.
+`libxi-dev libxmu-dev libasound2-dev audiofile-tools`
 
 Install [HTK 3.4.1](http://htk.eng.cam.ac.uk).
 (To handle files larger than 2 GB on 64-bit Linux:
@@ -43,7 +34,7 @@ Start Visual Studio.  In the Timeliner project, rightclick Properties.
     *   In VC++ Directories, add the Include Directory and Library Directory where you installed freeglut.
     *   In VC++ Directories, add the Include Directory and Library Directory where you installed libsndfile.  
             (This is smarter than copying `*.lib` and `*.h` into the Timeliner project.)  
-            (Beware the different directories `Program Files` and `Program Files (x86).`)
+            (Beware the different directories `Program Files` and `Program Files (x86)`.)
     *   In Debugging, for Command Arguments specify a marshal dir, e.g. `example\marshal`.
     *   In Linker/Input, additional, prepend `dsound.lib;libsndfile-1.lib;opengl32.lib;freeglut_static.lib;`.
 *   For Configuration, choose Debug.

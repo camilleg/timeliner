@@ -23,8 +23,6 @@
 #else
 #include <pthread.h>
 #include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <linux/soundcard.h>
@@ -41,9 +39,8 @@
 #define GLUT_WHEEL_DOWN (4)
 #endif
 
-using namespace std;
-
 #include "timeliner_cache.h"
+#include "timeliner_util.h"
 
 #ifdef _MSC_VER
 void snooze(double sec) { Sleep(DWORD(sec * 1e3)); }
@@ -145,12 +142,12 @@ class Logger {
 public:
   Logger(const char* filename): _o(filename) {}
   ~Logger() { _o.close(); }
-  void warn (const string& _) { _log(_, 'W', " WARN"); }
-  void info (const string& _) { _log(_, 'I', " INFO"); }
-  void debug(const string& _) { _log(_, 'D', "DEBUG"); }
+  void warn (const std::string& _) { _log(_, 'W', " WARN"); }
+  void info (const std::string& _) { _log(_, 'I', " INFO"); }
+  void debug(const std::string& _) { _log(_, 'D', "DEBUG"); }
 private:
-  ofstream _o;
-  void _log(const string& _, char c, const char* name) {
+  std::ofstream _o;
+  void _log(const std::string& _, char c, const char* name) {
     _o << c << ", [" << appnow() << "] " << name << ": " << _ << "\n";
   }
 };
@@ -483,76 +480,6 @@ void putsGlut(const char* pch = sprintfbuf)
   while (*pch) glutBitmapCharacter(font, *pch++);
 }
 
-class Mmap {
-  char* _pch;
-#ifdef _MSC_VER
-  LARGE_INTEGER _cch;
-  HANDLE h, h2;
-#else
-  size_t _cch;
-  int _fd;
-#endif
-
-public:
-#ifdef _MSC_VER
-  Mmap(const string& szFilename, bool fOptional=true) : _pch(NULL) {
-    h = CreateFile(
-		std::wstring(szFilename.begin(), szFilename.end()).c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (h == INVALID_HANDLE_VALUE) {
-      if (!fOptional)
-	    warn("problem opening file" + szFilename);
-      return;
-    }
-    h2 = CreateFileMapping(h, NULL, PAGE_READONLY, 0, 0, NULL);
-    if (h2 == NULL)
-      warn("problem #2 opening file" + szFilename);
-    _pch = (char*)MapViewOfFile(h2, FILE_MAP_READ, 0, 0, 0);
-
-    _cch.QuadPart = 0;
-    if (GetFileSizeEx(h, &_cch) == 0)
-      warn("problem measuring file" + szFilename);
-  }
-  ~Mmap() {
-	if (h != INVALID_HANDLE_VALUE) {
-      UnmapViewOfFile(_pch);
-	  if (h2 != NULL)
-		CloseHandle(h2);
-	  CloseHandle(h);
-	}
-  }
-  const size_t cch() const { return size_t(_cch.QuadPart); }
-#else
-  Mmap(const string& szFilename, bool fOptional=true) : _pch(NULL), _cch(0), _fd(-1) {
-    _fd = open(szFilename.c_str(), O_RDONLY);
-    if (_fd < 0) {
-      if (!fOptional)
-	warn("problem opening file" + szFilename);
-      return;
-    }
-    struct stat s;
-    fstat(_fd, &s);
-    _cch = s.st_size; // possibly 0, for an empty file
-    _pch = (char*)mmap(NULL, _cch, PROT_READ, MAP_SHARED, _fd, 0);
-    if (_pch == MAP_FAILED) {
-      _pch = NULL;
-      warn("mmap failed");
-    }
-  }
-
-  ~Mmap() {
-    if (_pch && munmap(_pch, _cch) == -1)
-      warn("munmap failed");
-    if (_fd >= 0)
-      close(_fd);
-  }
-
-  const size_t cch() const { return _cch; }
-#endif
-
-  const char*  pch() const { return _pch; }
-  const bool valid() const { return _pch != NULL; } // Better would be C++11 safe-bool explicit operator bool() const;
-};
-
 void prepTexture(GLuint t)
 {
   glBindTexture(GL_TEXTURE_2D, t);
@@ -618,7 +545,7 @@ class Feature {
 
 public:
   int cchunk;
-  vector<Slartibartfast> rgTex;
+  std::vector<Slartibartfast> rgTex;
 
   Feature(int /*iColormap*/, const char* filename, const char* dirname): _fValid(false) {
     if (mb == mbUnknown) {
@@ -626,7 +553,7 @@ public:
       if (!hasGraphicsRAM())
 	warn("Found no dedicated graphics RAM.  May run slowly.");
     }
-    const Mmap foo(string(dirname) + "/" + string(filename));
+    const Mmap foo(dirname + std::string("/") + filename);
     if (!foo.valid())
       return;
     binaryload(foo.pch(), foo.cch()); // stuff many member variables
@@ -769,7 +696,7 @@ private:
   char _name[1000];
 };
 int Feature::mb = mbUnknown;
-vector<Feature*> features;
+std::vector<Feature*> features;
 
 void drawFeatures()
 {
@@ -777,7 +704,7 @@ void drawFeatures()
     return;
   }
 
-  vector<Feature*>::const_iterator f;
+  std::vector<Feature*>::const_iterator f;
 
   // Compute y's: amortize among vectorsizes.  Sqrt gives "thin" features more space.
   double rgdy[100]; //hardcoded;;  instead, grow a vector.
@@ -926,13 +853,13 @@ void drawWaveform()
   const double yTweak = (YWavMax/2-YTick)/(YTick*2) /channels;
   assert(channels == wavedrawers.size());
   unsigned i=0;
-  for (vector<WaveDraw>::iterator it = wavedrawers.begin(); it != wavedrawers.end(); ++it,++i) {
+  for (std::vector<WaveDraw>::iterator it = wavedrawers.begin(); it != wavedrawers.end(); ++it,++i) {
     float dst[2];
     it->cacheWav->getbatch(dst, tShow[0]+hack, tShow[1]+hack, 1, 1.0/(scaleWavDefault * pixelSize[1]));
     float& xmin = dst[0];
     float& xmax = dst[1];
     // [xmin.abs, xmax.abs].max is a shortcut for minmaxes.map{|x| x.abs}.max 
-    it->scaleWavAim = scaleWavFromSampmax(max(abs(xmin), abs(xmax)));
+    it->scaleWavAim = scaleWavFromSampmax(std::max(abs(xmin), abs(xmax)));
 
     glPushMatrix();
       // The Y-extent of a monophonic waveform is YTick * [2..6].
@@ -1112,7 +1039,7 @@ void aim()
   tShowPrev[0] = tShow[0];
   tShowPrev[1] = tShow[1];
 
-  for (vector<WaveDraw>::iterator it = wavedrawers.begin(); it != wavedrawers.end(); ++it) {
+  for (std::vector<WaveDraw>::iterator it = wavedrawers.begin(); it != wavedrawers.end(); ++it) {
     it->update();
   }
 }
@@ -1276,7 +1203,7 @@ void keyboard(unsigned char key, int x, int /*y*/)
     case 'd':
       {
 	// 1e-4 allows pan slightly outside tShowBound, for visual warning.
-	const double dsec = min(dsecondFromGL(panspeed), tShowBound[1]-tAim[1] + 1e-4);
+	const double dsec = std::min(dsecondFromGL(panspeed), tShowBound[1]-tAim[1] + 1e-4);
 	if (dsec > 0.0) {
 	  tAim[0] += dsec;
 	  tAim[1] += dsec;
@@ -1285,7 +1212,7 @@ void keyboard(unsigned char key, int x, int /*y*/)
       break;
     case 'a':
       {
-	const double dsec = min(dsecondFromGL(panspeed), tAim[0]-tShowBound[0] + 1e-4);
+	const double dsec = std::min(dsecondFromGL(panspeed), tAim[0]-tShowBound[0] + 1e-4);
 	if (dsec > 0.0) {
 	  tAim[0] -= dsec;
 	  tAim[1] -= dsec;
@@ -1465,11 +1392,11 @@ void drawThumb()
 {
   const double yTop = YTick * 0.9;
   const double dt = tShowBound[1] - tShowBound[0];
-  double x0 = max(0.0, (tShow[0] - tShowBound[0]) / dt);
+  double x0 = std::max(0.0, (tShow[0] - tShowBound[0]) / dt);
   assert(pixelSize[0] > 0);
   const double dxMin = 2.0/pixelSize[0];
   const double x1Min = x0 + dxMin;
-  double x1 = max(x1Min, (tShow[1] - tShowBound[0]) / dt);
+  double x1 = std::max(x1Min, (tShow[1] - tShowBound[0]) / dt);
   if (x1 > 1.0) {
     // scoot left to be visible
     x0 -= x1 - 1.0;
@@ -1648,6 +1575,7 @@ const char* dirMarshal = ".timeliner_marshal";
 
 int main(int argc, char** argv)
 {
+  appname = argv[0];
   testConverters();
 
 #ifndef _MSC_VER
@@ -1669,7 +1597,7 @@ int main(int argc, char** argv)
     logfilename = argv[2];
   applog = new Logger(logfilename);
 
-  const string wav(dirMarshal + string("/mixed.wav"));
+  const std::string wav(dirMarshal + std::string("/mixed.wav"));
   // www.mega-nerd.com/libsndfile/api.html
   SF_INFO sfinfo;
   sfinfo.format = 0;
@@ -1699,7 +1627,7 @@ int main(int argc, char** argv)
   // Clever fast memory-conserving shortcut for monophonic.
   short* channelS16 = channels==1 ? wavS16 : new short[wavcsamp];
   const double msec_resolution = 0.3;
-  const double undersample = max(1.0, msec_resolution * 1e-3 * SR);
+  const double undersample = std::max(1.0, msec_resolution * 1e-3 * SR);
   for (unsigned i=0; i<channels; ++i) {
     if (channels != 1)
       for (long j=0; j<wavcsamp; ++j)

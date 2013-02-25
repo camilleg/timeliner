@@ -14,6 +14,6 @@ wav=choral.wav
 numchans=100
 
 0 ExampleFilterbanque
-#3 ExampleWavelette
+3 ExampleWavelette
 #2 ExampleANN 1 trainANN.wts
-#1 ExampleMFCC
+1 ExampleMFCC

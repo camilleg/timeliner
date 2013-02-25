@@ -3,7 +3,6 @@
 #include <cstdio>
 #include <cstring>
 #include <cmath>
-using namespace std;
 
 #include "timeliner_cache.h"
 
@@ -22,7 +21,7 @@ CHello::~CHello() {
   // Deallocate members of layers, then layers itself.
   assert(layers);
   assert(!layers->empty());
-  for (vector<VD*>::iterator i = layers->begin(); i != layers->end(); ++i)
+  for (std::vector<VD*>::iterator i = layers->begin(); i != layers->end(); ++i)
     delete *i;
   delete layers;
 }
@@ -36,19 +35,19 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
   cb(0)
 {
   if (SUB < 1) {
-    cout << "error: nonpositive cache undersampler.\n";
+    std::cout << "error: nonpositive cache undersampler.\n";
     exit(1);
   }
   if (hz <= 0.0) {
-    cout << "error: cache got nonpositive sample rate " << hz << ".\n";
+    std::cout << "error: cache got nonpositive sample rate " << hz << ".\n";
     exit(1);
   }
   if (width < 1) {
-    cout << "error: cache got nonpositive vector width " << width << ".\n";
+    std::cout << "error: cache got nonpositive vector width " << width << ".\n";
     exit(1);
   }
   if (width > int(CQuartet_widthMax)) {
-    cout << "error: recompile timeliner's timeliner_cache.h with CQuartet_widthMax >= " << width << ", not " << CQuartet_widthMax << ".\n";
+    std::cout << "error: recompile timeliner's timeliner_cache.h with CQuartet_widthMax >= " << width << ", not " << CQuartet_widthMax << ".\n";
     exit(1);
   }
 
@@ -56,7 +55,7 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
   // MMM are just the value.
   // numels is 1.
   // tMin,tMax are derived from offset into array of leaves.
-  layers = new vector<VD*>;
+  layers = new std::vector<VD*>;
   assert(cs % width == 0);
   const unsigned cLeaves = cs / width / SUB;
 #ifdef VERBOSE
@@ -232,7 +231,7 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
       const int cParentOfTwoKids = (odd ? cTwigPrev-1 : cTwigPrev) / 2;
       const int cTwig = (odd ? cTwigPrev+1 : cTwigPrev) / 2;
       if (cTwig > 1000000)
-	cout << "Cache: stuff " << cTwig << " nodes.\n";
+	std::cout << "Cache: stuff " << cTwig << " nodes.\n";
 
       // Write new layer.
       layers->push_back(new VD(cTwig*czNode, 0.0));
@@ -313,19 +312,19 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
   cb(0)
 {
   if (SUB < 1) {
-    cout << "error: nonpositive cache undersampler.\n";
+    std::cout << "error: nonpositive cache undersampler.\n";
     exit(1);
   }
   if (hz <= 0.0) {
-    cout << "error: cache got nonpositive sample rate " << hz << ".\n";
+    std::cout << "error: cache got nonpositive sample rate " << hz << ".\n";
     exit(1);
   }
   if (width < 1) {
-    cout << "error: cache got nonpositive vector width " << width << ".\n";
+    std::cout << "error: cache got nonpositive vector width " << width << ".\n";
     exit(1);
   }
   if (width > int(CQuartet_widthMax)) {
-    cout << "error: recompile timeliner's ruby extension main.cpp with CQuartet_widthMax >= " << width << ", not " << CQuartet_widthMax << ".\n";
+    std::cout << "error: recompile timeliner's ruby extension main.cpp with CQuartet_widthMax >= " << width << ", not " << CQuartet_widthMax << ".\n";
     exit(1);
   }
 
@@ -333,7 +332,7 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
   // MMM are just the value.
   // numels is 1.
   // tMin,tMax are derived from offset into array of leaves.
-  layers = new vector<VD*>;
+  layers = new std::vector<VD*>;
   assert(cs % width == 0);
   const unsigned cLeaves = cs / width / SUB;
 #ifdef VERBOSE
@@ -509,7 +508,7 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
       const int cParentOfTwoKids = (odd ? cTwigPrev-1 : cTwigPrev) / 2;
       const int cTwig = (odd ? cTwigPrev+1 : cTwigPrev) / 2;
       if (cTwig > 1000000)
-	cout << "Cache: stuff " << cTwig << " nodes.\n";
+	std::cout << "Cache: stuff " << cTwig << " nodes.\n";
 
       // Write new layer.
       layers->push_back(new VD(cTwig*czNode, 0.0));
@@ -620,7 +619,7 @@ static inline const CQuartet merge_for_recurse(const CQuartet& a, const CQuartet
   return CQuartet(w, t);
 }
 
-const CQuartet CHello::recurse(const vector<VD*>* const layers, const Float s, const Float t, const int iLayer, const unsigned iz) const
+const CQuartet CHello::recurse(const std::vector<VD*>* const layers, const Float s, const Float t, const int iLayer, const unsigned iz) const
 {
   assert(iLayer >= 0);
   const bool fSpecial = fShrunkleaves && iLayer == 0;
