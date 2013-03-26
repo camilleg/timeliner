@@ -721,8 +721,8 @@ void CHello::getbatch(float* r, const double t0, const double t1, const unsigned
       yMax = Float(yMid + dyMin);
     }
     assert(yMax - yMin >= dyMin);
-    *r++ = yMin;
-    *r++ = yMax;
+    *r++ = float(yMin);
+    *r++ = float(yMax);
   }
 #if 0
   if (tFail > 0.0)

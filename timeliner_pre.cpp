@@ -474,6 +474,8 @@ int main(int argc, char** argv)
     // todo: convert to 16-bit 16khz, before storing in wavS16.  Without calling system("sox ..."), so it works in win32.
 #ifdef _MSC_VER
     #error "todo: port system('cp ...') to windows"
+#define strtof(a,b) strtol(a,b,10)
+#pragma message("warning: Visual Studio doesn't support C99's strtof().")
 #else
     if (-1 == system(("cp " + wavSrc + " " + dirMarshal + "/mixed.wav").c_str()))
       quit("system(cp) failed");
@@ -594,7 +596,7 @@ int main(int argc, char** argv)
     //;;;; do this for win32 too, *constructing* mixed.wav.
     const std::string mixedfile = dirMarshal + "/mixed.wav";
     SF_INFO sfinfo;
-    sfinfo.samplerate = SR = samplesPerSecond;
+    sfinfo.samplerate = SR = int(samplesPerSecond);
     sfinfo.channels = channels_fake;
     sfinfo.format = SF_FORMAT_WAV|SF_FORMAT_PCM_16;
     SNDFILE* pf = sf_open(mixedfile.c_str(), SFM_WRITE, &sfinfo);

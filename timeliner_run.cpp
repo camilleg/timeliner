@@ -21,6 +21,7 @@
 #include <time.h>
 #include <iostream>
 #include <sstream>
+#include <functional>
 #else
 #include <pthread.h>
 #include <sys/ioctl.h>
@@ -77,7 +78,7 @@ int gettimeofday(struct timeval *tv, struct timezone *tz)
     FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
     const unsigned __int64 usecNow =
-      ((ft.dwHighDateTime << 32) | ft.dwLowDateTime) / 10 - DELTA_EPOCH_IN_MICROSECS;
+      (((unsigned __int64)(ft.dwHighDateTime) << 32) | ft.dwLowDateTime) / 10 - DELTA_EPOCH_IN_MICROSECS;
     tv->tv_sec  = (long)(usecNow / 1000000UL);
     tv->tv_usec = (long)(usecNow % 1000000UL);
   }
