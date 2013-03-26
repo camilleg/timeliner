@@ -232,7 +232,7 @@ static signed short *samples = NULL;
 static snd_pcm_channel_area_t *areas = NULL;
 static snd_pcm_t *handle = NULL;
 
-void alsaInit()
+void alsaInit(const unsigned SR)
 {
     setenv("ALSA_CARD", "0", 1);
     snd_pcm_hw_params_t *hwparams; snd_pcm_hw_params_alloca(&hwparams);
@@ -242,6 +242,8 @@ void alsaInit()
         printf("Output failed: %s\n", snd_strerror(err));
         return;
     }
+    if (SR != rate)
+      printf("Warning: ALSA playback overriding requested sample rate of %d Hz with hardcoded %d Hz.\n", SR, rate);
     printf("Playback device is %s\n", device);
     printf("Stream parameters are %iHz, %s, %i channels\n", rate, snd_pcm_format_name(format), channels);
     if ((err = snd_pcm_open(&handle, device, SND_PCM_STREAM_PLAYBACK, 0)) < 0) {

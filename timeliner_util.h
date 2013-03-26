@@ -9,7 +9,7 @@ class Mmap {
   LARGE_INTEGER _cch;
   HANDLE h, h2;
 #else
-  size_t _cch;
+  off_t _cch;
   int _fd;
 #endif
 
@@ -19,8 +19,8 @@ public:
   const char*  pch() const { return _pch; }
   const bool valid() const { return _pch != NULL; } // Better would be C++11 safe-bool explicit operator bool() const;
 #ifdef _MSC_VER
-  const size_t cch() const { return size_t(_cch.QuadPart); }
+  const off_t cch() const { return off_t(_cch.QuadPart); }
 #else
-  const size_t cch() const { return _cch; }
+  const off_t cch() const { return _cch; }
 #endif
 };

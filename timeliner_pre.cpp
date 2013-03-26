@@ -4,7 +4,6 @@
 
 #undef DEBUG
 
-#include "timeliner_common.h"
 #include "timeliner_diagnostics.h"
 
 #include <algorithm> 
@@ -41,7 +40,7 @@
 #include <unistd.h>
 #endif
 
-// Linux:   aptitude install libsndfile1-dev
+// Linux:   apt-get install libsndfile1-dev
 // Windows: www.mega-nerd.com/libsndfile/ libsndfile-1.0.25-w64-setup.exe
 #include <sndfile.h>
 
@@ -75,6 +74,7 @@ void fileFromBufs(const std::string& outfilename, const char* pb, const long cb,
 
 short** rawS16 = NULL;
 long wavcsamp = -1;
+int SR = -1;
 
 #ifndef M_PI
 #define M_PI (3.1415926535898)
@@ -150,7 +150,7 @@ std::string writeHTKWavelet(const int channel, const std::string& fileOut, const
 #endif
 }
 
-int channels = 1;  // mono, stereo, etc
+unsigned channels = 1;  // mono, stereo, etc
 int numchans = 62; // frequency bands per filterbank, mfcc, or wavelet
 const float sampPeriodF = 100000.0;
 const std::string sampPeriod = "100000.0"; // hnsu, hundreds of nanoseconds, i.e. 1e-7 seconds, or decimicroseconds.
@@ -210,7 +210,7 @@ std::string htkFromWav(const int channel, const int iKind, const std::string& in
     warn("failed to close wav");
 
   if (-1 == system(("HCopy -A -T 1 -C " + Hcfg + " " + channelfile + " " + Outfile).c_str()))
-    quit("system() failed");
+    quit("system(HCopy) failed");
   if (0 != remove(channelfile.c_str()))
     quit("failed to remove " + channelfile);
   if (0 != remove(Hcfg.c_str()))
@@ -434,7 +434,7 @@ int main(int argc, char** argv)
       if (!wavSrc.empty())
 	warn("Config file " + configfile + ": duplicate wav");
       wavSrc = value;
-      info("Source audio is " + wavSrc);
+      info("Source recording is " + wavSrc);
     }
     else if (key == "numchans") {
       numchans = atoi(value.c_str());
@@ -449,65 +449,186 @@ int main(int argc, char** argv)
   if (chdir(dirMarshal.c_str()) != 0 || chdir("..") != 0)
     quit("failed to chdir to dir above marshal dir");
 
-  // www.mega-nerd.com/libsndfile/api.html
-  SF_INFO sfinfo;
-  sfinfo.format = 0;
-  SNDFILE* pf = sf_open(wavSrc.c_str(), SFM_READ, &sfinfo);
-  if (!pf) {
+  const std::string suffix = wavSrc.substr(wavSrc.size()-3);
+  if (suffix == "wav") {
+    // www.mega-nerd.com/libsndfile/api.html
+    SF_INFO sfinfo;
+    sfinfo.format = 0;
+    SNDFILE* pf = sf_open(wavSrc.c_str(), SFM_READ, &sfinfo);
+    if (!pf) {
 #ifdef _MSC_VER
-    char buf[MAX_PATH];
-    (void)GetFullPathNameA(wavSrc.c_str(), MAX_PATH, buf, NULL);
-    quit(std::string("no wav file ") + std::string(buf));
+      char buf[MAX_PATH];
+      (void)GetFullPathNameA(wavSrc.c_str(), MAX_PATH, buf, NULL);
+      quit(std::string("no wav file ") + std::string(buf));
 #else
-    quit("no wav file " + wavSrc  + " in directory " + get_current_dir_name());
+      quit("no wav file " + wavSrc  + " in directory " + get_current_dir_name());
 #endif
-  }
-  //printf("%ld frames, %d SR, %d channels, %x format, %d sections, %d seekable\n",
-  //  long(sfinfo.frames), sfinfo.samplerate, sfinfo.channels, sfinfo.format, sfinfo.sections, sfinfo.seekable);
-
-  if (sfinfo.samplerate != SR)
-    quit(wavSrc + " doesn't have 16 kHz sampling rate.  Sorry.");
-  if (sfinfo.format != (SF_FORMAT_WAV | SF_FORMAT_PCM_16))
-    quit(wavSrc + " doesn't have format .wav PCM 16-bit.  Sorry.");
-  // todo: /usr/include/sndfile.h actually supports dozens of other file formats.  So allow those.
-  // todo: convert to 16-bit 16khz, before storing in wavS16.  Without calling system("sox ..."), so it works in win32.
-  if (-1 == system(("cp " + wavSrc + " " + dirMarshal + "/mixed.wav").c_str()))
-    quit("system() failed");
-  info("reading " + wavSrc);
-  wavcsamp = long(sfinfo.frames);
-  channels = sfinfo.channels;
-  short* wavS16 = new short[wavcsamp * channels];
-  const long cs = long(sf_readf_short(pf, wavS16, wavcsamp));
-  if (cs != wavcsamp)
-    quit("failed to read " + wavSrc);
-  if (0 != sf_close(pf))
-    warn("failed to close " + wavSrc);
-  info("readed " + wavSrc);
-
-  rawS16 = new short*[channels];
-  if (channels == 1) {
-    rawS16[0] = wavS16;
-    // Cleverly, wavS16 gets delete[]'d eventually, as rawS16[0].
-  } else {
-    // De-interleave wavS16 into separate channels, 1 short at a time.
-    // This is http://en.wikipedia.org/wiki/In-place_matrix_transposition .
-    // Expensive and thrash-prone, thus better avoided by instead changing how memory is accessed.
-    info("de-interleaving channels");
-    for (int i=0; i<channels; ++i) {
-      short* ps = new short[wavcsamp];
-      for (long j=0; j<wavcsamp; ++j)
-	ps[j] = wavS16[j*channels + i];
-      rawS16[i] = ps;
     }
-    info("de-interleaved channels");
-    delete [] wavS16;
+    SR = sfinfo.samplerate;
+    //printf("%ld frames, %d SR, %d channels, %x format, %d sections, %d seekable\n",
+    //  long(sfinfo.frames), sfinfo.samplerate, sfinfo.channels, sfinfo.format, sfinfo.sections, sfinfo.seekable);
+
+    if (sfinfo.format != (SF_FORMAT_WAV | SF_FORMAT_PCM_16))
+      quit(wavSrc + " doesn't have format .wav PCM 16-bit.  Sorry.");
+    // todo: /usr/include/sndfile.h actually supports dozens of other file formats.  So allow those.
+    // todo: convert to 16-bit 16khz, before storing in wavS16.  Without calling system("sox ..."), so it works in win32.
+#ifdef _MSC_VER
+    #error "todo: port system('cp ...') to windows"
+#else
+    if (-1 == system(("cp " + wavSrc + " " + dirMarshal + "/mixed.wav").c_str()))
+      quit("system(cp) failed");
+#endif
+    info("reading " + wavSrc);
+    wavcsamp = long(sfinfo.frames);
+    channels = sfinfo.channels;
+    short* wavS16 = new short[wavcsamp * channels];
+    const long cs = long(sf_readf_short(pf, wavS16, wavcsamp));
+    if (cs != wavcsamp)
+      quit("failed to read " + wavSrc);
+    if (0 != sf_close(pf))
+      warn("failed to close " + wavSrc);
+    info("readed " + wavSrc);
+
+    rawS16 = new short*[channels];
+    if (channels == 1) {
+      rawS16[0] = wavS16;
+      // Cleverly, wavS16 gets delete[]'d eventually, as rawS16[0].
+    } else {
+      // De-interleave wavS16 into separate channels, 1 short at a time.
+      // This is http://en.wikipedia.org/wiki/In-place_matrix_transposition .
+      // Expensive and thrash-prone, thus better avoided by instead changing how memory is accessed.
+      info("de-interleaving channels");
+      for (unsigned i=0; i<channels; ++i) {
+	short* ps = new short[wavcsamp];
+	for (long j=0; j<wavcsamp; ++j)
+	  ps[j] = wavS16[j*channels + i];
+	rawS16[i] = ps;
+      }
+      info("de-interleaved channels");
+      delete [] wavS16;
+    }
+
+  } else if (suffix == "rec") {
+    // EDF (European Data Format, http://www.edfplus.info/specs/edf.html ) EEG recording.
+    // Also http://code.google.com/p/telehealth/source/browse/lifelink/rxbox/trunk/rxbox-rc1/Local_EDFviewer/edfviewer.py?r=559
+    const Mmap* foo = new Mmap(wavSrc); // might not need that pointer
+    const char* pch = foo->pch();
+    const off_t cch = foo->cch();
+    if (cch == 0)
+      quit("empty EDF file " + wavSrc);
+    if (cch < 256)
+      quit("truncated global header in EDF file " + wavSrc);
+    //info("parsing EDF header");
+    //info(std::string(pch, 256));
+
+    // Lazily ignore strtol's errno: http://stackoverflow.com/questions/194465/how-to-parse-a-string-to-an-int-in-c
+    char* end;
+    const long bytesInHeader        = strtol(std::string(pch+184, 8).c_str(), &end, 10); // 24320.
+    long numRecords                 = strtol(std::string(pch+236, 8).c_str(), &end, 10);
+    const double secondsPerRecord   = strtof(std::string(pch+244, 8).c_str(), &end);
+    channels                        = strtol(std::string(pch+252, 4).c_str(), &end, 10);
+
+    if (bytesInHeader != 256 + channels*256)
+      quit("corrupt global header in EDF file " + wavSrc);
+    // fseek past bytesInHeader + 1*bytesPerRecord.
+    // for irec 1..nrec:
+    // read shorts, from samplesPerRecord to channels.
+    // save from   (irec-1)*samplesPerRecord+1   to   irec*samplesPerRecord
+
+    // const double hours = numRecords * secondsPerRecord / 3600.0;
+    // std::cerr << numRecords << " records, " << channels << " channels, " << secondsPerRecord << " sec/record, " << hours << " hours.\n";
+
+    if (cch < bytesInHeader)
+      quit("truncated per-channel header in EDF file " + wavSrc);
+    pch += 256;
+
+    pch += channels * (16+80+8+8+8+8+8+80); // For now, skip lbl trt pdq pmn pmx dmn dmx pft.
+    // Samples per data record.
+    // Rashly use only the first (326).   ;;;; Verify every "nsp"?
+    const int samplesPerRecord = strtol(std::string(pch, 8).c_str(), &end, 10); // "nsp" in Kyle's parser.  shortsPerChannelInARecord.
+
+    const double samplesPerSecond = samplesPerRecord / secondsPerRecord;
+    const long shortsPerRecord = samplesPerRecord * channels;
+    const long bytesPerRecord = shortsPerRecord * 2; // "rsz" in Kyle's parser
+    // std::cerr << "sr is " << samplesPerSecond << ".\n" << bytesPerRecord << " bytesPerRecord.\n";
+    pch += channels * (8+32); // Skip "nsp".  Now pch points at the signed 16-bit data.
+
+    info("parsing EDF body: creating .wav file");
+    // off_t expectedEOF = bytesPerRecord * numRecords;
+    // assert(pch - foo->pch() + expectedEOF == cch);
+    // const off_t cs = expectedEOF/2;
+    const short* ps = (const short*)pch; // yeah, yeah, pointer aliasing, shaddap already
+
+    // std::cerr << "header was " << pch-foo->pch() << " bytes, body should be " << bytesPerRecord * numRecords << " bytes, cch is " << cch << "\n";
+
+    // The specification says:
+    //   Each data record contains 'duration' seconds of 'ns' signals.
+    //   Each signal is represented by the header-specified number of samples.
+    // In other words:
+    //   After the header comes a sequence of blocks.
+    //   Each block is a concatenation of "channels" sequences of shorts.
+
+    const int channels_fake = 15; // channels;
+
+    wavcsamp = numRecords * samplesPerRecord;
+    numRecords /= 1000; info("debug: reading a fraction of the data");
+    const long wavcsamp_fake = numRecords * samplesPerRecord;
+
+    short* wavsamples = new short[wavcsamp_fake * channels_fake];
+
+    // Interleave samples, from within each Record, into wavsamples[].
+    for (long irecord=0; irecord<numRecords; ++irecord) {
+      if (irecord % 20 == 0) printf("Record %6ld of %6ld expects %ld shorts as %d sequences of %d.\n", irecord, numRecords, shortsPerRecord, channels, samplesPerRecord);
+      const short* psRecord = ps + irecord*shortsPerRecord;
+      for (int chan = 0; chan < channels_fake; ++chan)
+	memcpy(wavsamples + chan*wavcsamp_fake + irecord*samplesPerRecord,
+	  psRecord + chan*wavcsamp, 2*samplesPerRecord);
+    }
+
+    // timeliner_run *playing* 3- or 20- or 94-channel audio is silly.
+    // Must example/stereo/marshal/mixed.wav be 94-channel?
+    // Can timeliner_pre *somehow* marshal 94 mipmaps and a merely mono mixed.mp3?
+    // Build autoscaling into the mipmap?
+    // Combine wav drawn on spectrogram into a single mipmap?
+
+    //;;;; do this for win32 too, *constructing* mixed.wav.
+    const std::string mixedfile = dirMarshal + "/mixed.wav";
+    SF_INFO sfinfo;
+    sfinfo.samplerate = SR = samplesPerSecond;
+    sfinfo.channels = channels_fake;
+    sfinfo.format = SF_FORMAT_WAV|SF_FORMAT_PCM_16;
+    SNDFILE* pf = sf_open(mixedfile.c_str(), SFM_WRITE, &sfinfo);
+    if (!pf) {
+#ifdef _MSC_VER
+      char buf[MAX_PATH];
+      (void)GetFullPathNameA(mixedfile.c_str(), MAX_PATH, buf, NULL);
+      quit(std::string("failed to create wav file ") + std::string(buf));
+#else
+      quit("failed to create wav file");
+#endif
+    }
+    if (wavcsamp_fake != sf_writef_short(pf, wavsamples, wavcsamp_fake))
+      quit("failed to write " + mixedfile);
+    if (0 != sf_close(pf))
+      warn("failed to close wav file");
+
+    info("parsing EDF body: splitting channels");
+    rawS16 = new short*[channels];
+    for (unsigned j=0; j<channels; ++j) {
+      rawS16[j] = new short[wavcsamp_fake];
+      if (j<3)/*;;;; not using features yet, just bare wav */ memcpy(rawS16[j], ps+j*wavcsamp_fake, wavcsamp_fake*2);
+      //std::cerr << "split channel " << j << "/" << channels << "\n";
+    }
+
+  } else {
+    quit("unexpected suffix " + suffix + " of filename " + wavSrc);
   }
 
   int i=0;
   if (chdir(dirMarshal.c_str()) != 0)
     quit("failed to chdir to marshal dir " + dirMarshal);
   if (-1 == system("rm -rf features*")) // will be deprecated, when timeliner_pre generates mipmaps directly
-    quit("system() failed");
+    info("system(rm features*) failed");
   char filename[20] = "features ";  // will be deprecated, when timeliner_pre generates mipmaps directly
   for (it=lines.begin(); it!=lines.end(); ++it) {
     std::vector<std::string> tokens = split(*it, ' ');
@@ -523,7 +644,7 @@ int main(int argc, char** argv)
       warn("Config file " + configfile + ": ignoring line starting with negative feature-type index: " + *it);
       continue;
     }
-    for (int chan=0; chan<channels; ++chan) {
+    for (unsigned chan=0; chan<channels; ++chan) {
       std::cout << "Constructing a feature from channel " << chan << " of kind " << iColormap << " from source " << wavSrc << " with caption " << caption << "\n"; // << " and " << tokens.size() << " more args\n";
       const Feature feat(chan, iColormap, wavSrc, caption);
       filename[8] = '0' + i;
@@ -533,6 +654,6 @@ int main(int argc, char** argv)
     }
   }
 
-  for (int i=0; i<channels; ++i) delete [] rawS16[i];
+  for (unsigned i=0; i<channels; ++i) delete [] rawS16[i];
   return 0;
 }

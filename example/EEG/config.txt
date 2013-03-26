@@ -1,0 +1,12 @@
+# 0 filterbank, 1 mel-frequency cepstral coefficients, 2 ann, 3 wavelet.
+#
+# Then, if -1, a filename.
+# Then, a label ("ExampleFilterbank").
+# Then optionally, a number (for ANN: 0 means raw, 1 means log-linearized).
+# Then, if ANN, a weights file ("trainANN.wts").
+#
+# Filenames and labels may not include spaces.
+#
+# numchans indicates a filterbank's width and the number of MFCC's.
+
+wav=/r/timeliner/testcases/eeg/eeg.rec

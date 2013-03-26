@@ -14,7 +14,9 @@ static inline Float zmax(Float a, Float b) { return a>b ? a : b; }
 // Computing thousands of these per frame is faster than gigabytes of trivial lookup tables (see "Shrunk").
 inline Float TFromIleaf(unsigned long is, const Float hz)
 {
-  return (Float(is) - 0.5F) / hz; // roundoff error possible, when "is" so big that is+0.5 == (is+1)+0.5.
+  return (Float(is) - 0.5F) / hz;
+  // Roundoff error possible, when "is" so big that is+0.5 == (is+1)+0.5.
+  // Around 2e7 for Float=float, 3e26 for Float=double.
 }
 
 CHello::~CHello() {
@@ -60,10 +62,10 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
   const unsigned cLeaves = cs / width / SUB;
 #ifdef VERBOSE
   if (cLeaves > 500000) {
-    cout << "alloc " << cLeaves << " leaves";
+    std::cout << "alloc " << cLeaves << " leaves";
     if (SUB > 1)
-      cout << ", undersampled " << SUB << "x down to " << hz/SUB << " Hz.";
-    cout << "\n";
+      std::cout << ", undersampled " << SUB << "x down to " << hz/SUB << " Hz.";
+    std::cout << "\n";
   }
 #endif
   const unsigned cz = fShrunkleaves ? cs : cLeaves*czNode;
@@ -71,7 +73,7 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
   cb += cz * sizeof(Float);
 #ifdef VERBOSE
   if (cLeaves > 500000)
-    cout << "Stuff " << cLeaves << " leaves.\n";
+    std::cout << "Stuff " << cLeaves << " leaves.\n";
 #endif
 
         VD::iterator pz = layers->back()->begin();
@@ -154,7 +156,7 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
       const int cTwig = (odd ? cTwigPrev+1 : cTwigPrev) / 2;
 #ifdef VERBOSE
       if (cTwig > 250000)
-	cout << "Stuff " << cTwig << " nodes from shrunk leaves.\n";
+	std::cout << "Stuff " << cTwig << " nodes from shrunk leaves.\n";
 #endif
 
       // Write new layer.
@@ -230,8 +232,8 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
       const bool odd = cTwigPrev % 2 != 0;
       const int cParentOfTwoKids = (odd ? cTwigPrev-1 : cTwigPrev) / 2;
       const int cTwig = (odd ? cTwigPrev+1 : cTwigPrev) / 2;
-      if (cTwig > 1000000)
-	std::cout << "Cache: stuff " << cTwig << " nodes.\n";
+      if (cTwig > 2000000)
+	std::cout << "Cache: stuff " << cTwig << " float nodes == " << int(cTwig*czNode*8/1.0e6) << "MB.\n";
 
       // Write new layer.
       layers->push_back(new VD(cTwig*czNode, 0.0));
@@ -299,11 +301,11 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
     }
   }
 #ifndef NDEBUG
-  printf("cache uses %.1f MB\n", cb / float(1e6));
+  printf("cache of Floats uses %.0f MB mobo RAM\n", cb / float(1e6));
 #endif
 }
 
-// Exact 200-line copypaste between float* aSrc and int* aSrc.
+// Exact 200-line copypaste between float* aSrc and short* aSrc.
 CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const unsigned SUB, const int widthArg) :
   fShrunkleaves(SUB == 1),
   hz(hzArg),
@@ -337,10 +339,10 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
   const unsigned cLeaves = cs / width / SUB;
 #ifdef VERBOSE
   if (cLeaves > 500000) {
-    cout << "alloc " << cLeaves << " leaves";
+    std::cout << "Alloc " << cLeaves << " leaves";
     if (SUB > 1)
-      cout << ", undersampled " << SUB << "x down to " << hz/SUB << " Hz.";
-    cout << "\n";
+      std::cout << ", undersampled " << SUB << "x down to " << hz/SUB << " Hz.";
+    std::cout << "\n";
   }
 #endif
   const unsigned cz = fShrunkleaves ? cs : cLeaves*czNode;
@@ -348,7 +350,7 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
   cb += cz * sizeof(Float);
 #ifdef VERBOSE
   if (cLeaves > 500000)
-    cout << "Stuff " << cLeaves << " leaves.\n";
+    std::cout << "Stuff " << cLeaves << " leaves.\n";
 #endif
 
         VD::iterator pz = layers->back()->begin();
@@ -362,6 +364,7 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
     // Both tests are needed, lest pz overflow.  (Compiler bug??)
     while (iSrc != iSrcMax && pz != pzMax) {
       *pz++ = Float(*iSrc++);
+      // This float is likely outside [0,1], but within SHRT_MIN..SHRT_MAX.
       ++c;
     }
     assert(c == cLeaves*width);
@@ -431,7 +434,7 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
       const int cTwig = (odd ? cTwigPrev+1 : cTwigPrev) / 2;
 #ifdef VERBOSE
       if (cTwig > 250000)
-	cout << "stuff " << cTwig << " nodes from shrunk leaves.\n";
+	std::cout << "Stuff " << cTwig << " nodes from shrunk leaves.\n";
 #endif
 
       // Write new layer.
@@ -466,10 +469,10 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
 	  const Float _min = *pz++ = zmin(z1,  z2);
 	  const Float _mean = *pz++ = (z1 + z2) * 0.5F;
 	  const Float _max = *pz++ = zmax(z1,  z2);
-	  assert(0.0 <= _min); // for htk
+	  // These lie in [0,1] if this is an HTK feature,
+	  // but only in [SHRT_MIN,SHRT_MAX] if this is fShrunkLeaves .wav data.
 	  assert(_min <= _mean);
 	  assert(_mean <= _max);
-	  assert(_max <= 1.0); // for htk
 #ifdef NDEBUG
 	  _unused(_min);
 	  _unused(_mean);
@@ -507,8 +510,8 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
       const bool odd = cTwigPrev % 2 != 0;
       const int cParentOfTwoKids = (odd ? cTwigPrev-1 : cTwigPrev) / 2;
       const int cTwig = (odd ? cTwigPrev+1 : cTwigPrev) / 2;
-      if (cTwig > 1000000)
-	std::cout << "Cache: stuff " << cTwig << " nodes.\n";
+      if (cTwig > 2000000)
+	std::cout << "Cache: stuff " << cTwig << " int nodes == " << int(cTwig*czNode*8/1.0e6) << "MB.\n";
 
       // Write new layer.
       layers->push_back(new VD(cTwig*czNode, 0.0));
@@ -576,7 +579,7 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
     }
   }
 #ifndef NDEBUG
-  printf("cache uses %.1f MB\n", cb / float(1e6));
+  printf("cache of shorts uses %.0f MB mobo RAM\n", cb / float(1e6));
 #endif
 }
 
@@ -627,7 +630,10 @@ const CQuartet CHello::recurse(const std::vector<VD*>* const layers, const Float
   assert(iz % czNode == 0);
   const Float tMin = fSpecial ? TFromIleaf(iz/czNode    , hz) : L[iz  ];
   const Float tMax = fSpecial ? TFromIleaf(iz/czNode + 1, hz) : L[iz+1];
-  assert(tMin < tMax);
+  assert(tMin <= tMax);
+  // tMin == tMax is almost ok (e.g. when Float is float not double, for more than 2e7 samples),
+  // but then visual artifacts happen (blocky when zoomed in).
+
   if (t < tMin || tMax < s) {
     // disjoint
     static const CQuartet nil;
@@ -676,6 +682,7 @@ const CQuartet CHello::recurse(const std::vector<VD*>* const layers, const Float
 }
 
 // Return interleaved min and max.
+// Force each max to exceed its corresponding min by at least dyMin.
 void CHello::getbatch(float* r, const double t0, const double t1, const unsigned cstep, const double dyMin) const
 {
   assert(dyMin > 0.0);
@@ -683,13 +690,16 @@ void CHello::getbatch(float* r, const double t0, const double t1, const unsigned
 #if 0
   double tFail = -1.0;
 #endif
+  // This tMin-tLim computation is cleverer than in the sister functions, avoiding multiplies.
+  // Todo: measure if it's actually faster.
   const double dt = (t1-t0) / double(cstep);
-  Float yMin, yMax;
-  for (unsigned i=0; i<cstep; ++i) {
-    const Float tMin = Float(t - 0.5 * dt);
-    const Float tLim = Float(t + 0.5 * dt);
-    // Exploit tMin = previous tLim?
+  Float tLimPrev = Float(t - 0.5 * dt);
+  Float tLim = Float(t + 0.5 * dt);
+  for (unsigned i=0; i<cstep; ++i, t+=dt, tLim+=dt) {
+    const Float tMin = tLimPrev;
+    tLimPrev = tLim;
     const CQuartet q(recurse(layers, tMin, tLim, layers->size() - 1, 0));
+    Float yMin, yMax;
     if (!q) {
       // Probably [t0,t1] isn't a subinterval of the cached interval.
       // todo: test explicitly for this.
@@ -705,6 +715,7 @@ void CHello::getbatch(float* r, const double t0, const double t1, const unsigned
     }
     const Float dy = yMax - yMin;
     if (dy < dyMin) {
+      // This also handles yMax < yMin.
       const Float yMid = (yMin + yMax) * 0.5F;
       yMin = Float(yMid - dyMin);
       yMax = Float(yMid + dyMin);
@@ -712,7 +723,6 @@ void CHello::getbatch(float* r, const double t0, const double t1, const unsigned
     assert(yMax - yMin >= dyMin);
     *r++ = yMin;
     *r++ = yMax;
-    t += dt;
   }
 #if 0
   if (tFail > 0.0)

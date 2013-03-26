@@ -1,12 +1,12 @@
 #ifdef _MSC_VER
-#define _CRT_SECURE_NO_WARNINGS		// for strcpy, getenv, _snprintf, fopen, fscanf
+#define _CRT_SECURE_NO_WARNINGS // for strcpy, getenv, _snprintf, fopen, fscanf
 #endif
 
 #undef DEBUG
 
-#include "timeliner_common.h"
 #include "timeliner_diagnostics.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cerrno>
 #include <cmath>
@@ -30,7 +30,7 @@
 #include <unistd.h>
 #endif
 
-// Linux:   aptitude install libsndfile1-dev
+// Linux:   apt-get install libsndfile1-dev
 // Windows: www.mega-nerd.com/libsndfile/ libsndfile-1.0.25-w64-setup.exe
 #include <sndfile.h>
 #include <vector>
@@ -58,65 +58,44 @@ inline double sq(double _) { return _*_; }
 #include <time.h>
 #include <iostream>
  
+// Difference between Unix epoch Jan 1 1970 and Windows epoch Jan 1 1601.
 #if defined(_MSC_VER) || defined(_MSC_EXTENSIONS)
-  #define DELTA_EPOCH_IN_MICROSECS  11644473600000000Ui64
+  #define DELTA_EPOCH_IN_MICROSECS  (11644473600000000Ui64)
 #else
-  #define DELTA_EPOCH_IN_MICROSECS  11644473600000000ULL
+  #define DELTA_EPOCH_IN_MICROSECS  (11644473600000000ULL)
 #endif
  
 struct timezone
 {
-  int  tz_minuteswest; /* minutes W of Greenwich */
-  int  tz_dsttime;     /* type of dst correction */
+  int tz_minuteswest; // minutes W of Greenwich
+  int tz_dsttime;     // type of dst correction
 };
 int gettimeofday(struct timeval *tv, struct timezone *tz)
 {
-// Define a structure to receive the current Windows filetime
-  FILETIME ft;
- 
-// Initialize the present time to 0 and the timezone to UTC
-  unsigned __int64 tmpres = 0;
-  static int tzflag = 0;
- 
   if (NULL != tv)
   {
+    FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
- 
-// The GetSystemTimeAsFileTime returns the number of 100 nanosecond 
-// intervals since Jan 1, 1601 in a structure. Copy the high bits to 
-// the 64 bit tmpres, shift it left by 32 then or in the low 32 bits.
-    tmpres |= ft.dwHighDateTime;
-    tmpres <<= 32;
-    tmpres |= ft.dwLowDateTime;
- 
-// Convert to microseconds by dividing by 10
-    tmpres /= 10;
- 
-// The Unix epoch starts on Jan 1 1970.  Need to subtract the difference 
-// in seconds from Jan 1 1601.
-    tmpres -= DELTA_EPOCH_IN_MICROSECS;
- 
-// Finally change microseconds to seconds and place in the seconds value. 
-// The modulus picks up the microseconds.
-    tv->tv_sec = (long)(tmpres / 1000000UL);
-    tv->tv_usec = (long)(tmpres % 1000000UL);
+    const unsigned __int64 usecNow =
+      ((ft.dwHighDateTime << 32) | ft.dwLowDateTime) / 10 - DELTA_EPOCH_IN_MICROSECS;
+    tv->tv_sec  = (long)(usecNow / 1000000UL);
+    tv->tv_usec = (long)(usecNow % 1000000UL);
   }
- 
+#ifdef unused_by_timeliner
   if (NULL != tz)
   {
-    if (!tzflag)
+    static bool fFirst = true;
+    if (fFirst)
     {
+      fFirst = false;
       _tzset();
-      tzflag++;
     }
-  
-	 // Adjust for the timezone west of Greenwich
-     long tmp;
-	 _get_timezone(&tmp);
-	 tz->tz_minuteswest = tmp / 60;
+    long tmp;
+    _get_timezone(&tmp);
+    tz->tz_minuteswest = tmp / 60;
     _get_daylight(&tz->tz_dsttime);
   }
- 
+#endif
   return 0;
 }
 #endif
@@ -160,27 +139,47 @@ Logger* applog = NULL;
 double tFPSPrev = appnow();
 double secsPerFrame = 1/60.0;
 
+const double yShowBound[2] = { 0.0, 1.0 };
+double yShowPrev[2] = {-2.0, -1.0}; // deliberately bogus
+double yZoom = 1.0;
+double yShow[2] = {yShowBound[0], yShowBound[1]}; // displayed interval of y, updated each frame
+double yAim[2] = {yShow[0], yShow[1]}; // setpoint for yShow, updated more slowly
+
 double tShowBound[2] = {0.0, 90000.0};
 double tShowPrev[2] = {-2.0, -1.0};	// deliberately bogus
 double tShow[2] = {tShowBound[0], tShowBound[1]};	// displayed interval of time, updated each frame
 double tAim[2] = {tShow[0], tShow[1]};	// setpoint for tShow, updated more slowly
 
-inline double dsecondFromGL(double dx) { return dx * (tShow[1] - tShow[0]); }
-inline double secondFromGL(double x) { return dsecondFromGL(x) + tShow[0]; }
-inline double glFromSecond(double s) { return (s - tShow[0]) / (tShow[1] - tShow[0]); }
+inline double dsecondFromGL(const double dx) { return dx * (tShow[1] - tShow[0]); }
+inline double secondFromGL(const double x) { return dsecondFromGL(x) + tShow[0]; }
+inline double glFromSecond(const double s) { return (s - tShow[0]) / (tShow[1] - tShow[0]); }
+
+// Like dsecondFromGL().
+inline double dyFromGL(const double dy) { return dy * (yShow[1] - yShow[0]); }
+
+// Like dyFromGL, but considering pan as well as zoom.  yFromGL : dyFromGL :: secondFromGL : dsecondFromGL.
+// Inverse of drawAll's scale and translate.
+inline double yFromGL(const double y) {
+  return dyFromGL(y) + yShow[0];
+}
+
+// Ignores yTimeline translate-and-scale.
+inline double glFromY(const double y) { return  (y - yShow[0]) / (yShow[1] - yShow[0]); }
 
 void testConverters()
 {
   for (double i = -30.0; i < 50.0; ++i) {
     assert(abs(i - glFromSecond(secondFromGL(i))) < 1e-10);
     assert(abs(i - secondFromGL(glFromSecond(i))) < 1e-10);
+    assert(abs(i - glFromY(yFromGL(i))) < 1e-10);
+    assert(abs(i - yFromGL(glFromY(i))) < 1e-10);
   }
 }
 
 long wavcsamp = -1L; // int wraps around too soon
 short* wavS16 = NULL;
 
-bool onscreen(double sec) { return sec >= tShow[0] && sec <= tShow[1]; }
+bool onscreen(const double sec) { return sec >= tShow[0] && sec <= tShow[1]; }
 
 #ifdef _MSC_VER
 #include <process.h>
@@ -241,7 +240,7 @@ LBackoff:
     }
   }
 
-  void _setName( const char* name ) {
+  void _setName(const char* name) {
     if (name != NULL) {
       _name = new char[strlen(name)+1];
       memcpy( (void*)_name, name, strlen(name)+1 );
@@ -348,6 +347,8 @@ LBackoff:
 
 };
 
+int SR = -1;
+
 // Implicitly unlocks when out of scope.
 class arGuard {
   arLock& _l;
@@ -439,7 +440,7 @@ public:
 private:
   // Start playing at offset of t seconds,
   // primarily by setting _sampBgn so emit() knows where to look for samples.
-  void soundplayNolock(double t) {
+  void soundplayNolock(const double t) {
     const long sampBgn = long(double(SR) * t);
     if (sampBgn<0 || sampBgn > wavcsamp) {
       warn("play out of range");
@@ -466,8 +467,7 @@ private:
 S2Splay s2s;
 
 GLuint texNoise;
-const double YTick = 0.03;
-int pixelSize[2] = {1150, 550};
+int pixelSize[2] = {1000,1000};
 
 double dxChar = 0.01;
 #define font GLUT_BITMAP_9_BY_15
@@ -483,7 +483,7 @@ void putsGlut(const char* pch = sprintfbuf)
   while (*pch) glutBitmapCharacter(font, *pch++);
 }
 
-void prepTexture(GLuint t)
+void prepTexture(const GLuint t)
 {
   glBindTexture(GL_TEXTURE_2D, t);
   assert(glIsTexture(t) == GL_TRUE);
@@ -493,7 +493,7 @@ void prepTexture(GLuint t)
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 }
 
-void prepTextureMipmap(GLuint t)
+void prepTextureMipmap(const GLuint t)
 {
   glBindTexture(GL_TEXTURE_1D, t);
   assert(glIsTexture(t) == GL_TRUE);
@@ -648,7 +648,7 @@ public:
     }
   }
 
-  const void makeTextureMipmap(const CHello& cacheHTK, int mipmaplevel, int width) const {
+  const void makeTextureMipmap(const CHello& cacheHTK, const int mipmaplevel, int width) const {
     assert(vectorsize() <= vecLim);
     assert(width % cchunk == 0);
     width /= cchunk;
@@ -701,6 +701,15 @@ private:
 int Feature::mb = mbUnknown;
 std::vector<Feature*> features;
 
+// Top of timeline, measured from bottom of window (y==0) to top of window (y==1).
+// todo: in resize(), keep this a constant # of pixels, e.g.  yTimeline = 20 / pixelSize[1];
+const double yTimeline = 0.03;
+
+// Measured from top of timeline (y==0) to top of window (y==1).
+// Within the transformation that uses yTimeline.
+// (Could adapt to # of channels and # of features?  Or will interleaving replace this?)
+const double yBetweenWaveformAndFeatures = 0.2;
+
 void drawFeatures()
 {
   if (features.empty()) {
@@ -720,7 +729,7 @@ void drawFeatures()
   }
   // rgdy[0 .. i-1] are heights.
   double rgy[100]; //hardcoded;;
-  rgy[0] = YTick*6.0;
+  rgy[0] = yBetweenWaveformAndFeatures;
   rgy[i] = 1.0;
   const double rescale = sum / (rgy[i] - rgy[0]);
   int j;
@@ -769,7 +778,7 @@ void drawFeatures()
   }
 }
 
-double linearlerp(double z, double min, double max)
+double linearlerp(const double z, const double min, const double max)
 {
   return z*max + (1.0-z)*min;
 }
@@ -778,19 +787,21 @@ double geometriclerp(double z, double min, double max)
 {
   if (z<0.0 || min<0.0 || max<0.0)
     return -1.0;			// handle error arbitrarily
-  z = sqrt(z);
+  z   = sqrt(z  );
   min = sqrt(min);
   max = sqrt(max);
   const double r = (z-min) / (max-min);
   return r*r;
 }
 
-double scaleWavFromSampmax(double s)
+unsigned int channels = 0; // == wavedrawers.size()
+
+// Convert 0..32768 to what drawWaveformScaled() will scale the waveform by.  (bug: for actual pixels, consider yTimeline too? *=(1-yTimeline) ?)
+double scaleWavFromSampmax(const double s)
 {
-  const double sMin = 25.0; // Threshold = 10 * log10(sMin^2 / 32768^2) = about -62 dB
-  if (s < sMin)
-    s = sMin;
-  return 0.98 * YTick*2 / s;
+  assert(0.0 <= s && s <= 32768.0);
+  const double sMin = 25.0; // Threshold == 10 * log10(sMin^2 / 32768^2) == about -62 dB
+  return 0.99 / std::max(s, sMin);
 }
 const double scaleWavDefault = scaleWavFromSampmax(32768.0);
 
@@ -820,23 +831,21 @@ public:
 };
 
 std::vector<WaveDraw> wavedrawers;
-unsigned int channels = 0; // == wavedrawers.size()
 
-void drawWaveformScaled(const float* minmaxes, double yScale) {
+void drawWaveformScaled(const float* minmaxes, const double yScale) {
   // As yScale from default 331000. to zoomedin 5000.0,
   // color from brightgreen 0.1,1.0,0.2 to cyan 0.0,0.25,0.3,
   // roughly constant #pixels times brightness.
-  const double ramp = yScale==scaleWavDefault ? 1.0 :
+  double ramp = yScale==scaleWavDefault ? 1.0 :
     (0.85/yScale - 5000.0) / (33100.0 - 5000.0) / 11.0; // 1.0 downto 0.009
+  ramp = std::max(ramp, 0.44); // Not too dark.
   glColor4d(linearlerp(ramp,0.07,0.1), geometriclerp(ramp,0.15,1.0), linearlerp(ramp,0.06,0.15), 1.0);
   glPushMatrix();
     glScaled(1.0/pixelSize[0], yScale, 1.0);
     glBegin(GL_LINES);
     for (int x = 0; x < pixelSize[0]; ++x) {
-      float y0 = minmaxes[x*2];
-      float y1 = minmaxes[x*2+1];
-      glVertex2f(GLfloat(x), y0);
-      glVertex2f(GLfloat(x), y1);
+      glVertex2f(GLfloat(x), minmaxes[x*2]);
+      glVertex2f(GLfloat(x), minmaxes[x*2+1]);
     }
     glEnd();
   glPopMatrix();
@@ -851,9 +860,9 @@ void drawWaveform()
   // Convert x-pixel extent to [t,t+dt] from [t-dt/2, t+dt/2].  Edge-centered not body-centered, sort of.
   const double hack = (tShow[1] - tShow[0])*0.5 * (pixelSize[0] / (pixelSize[0]-1));
 
-  const double YWavMax = features.empty() ? 1.0 : YTick*6.0;
-  const double heightPerChannel = (YWavMax-YTick*2.0)/channels;
-  const double yTweak = (YWavMax/2-YTick)/(YTick*2) /channels;
+  const double YWavMax = features.empty() ? 1.0 : yBetweenWaveformAndFeatures;
+  const double heightPerChannel = (YWavMax)/channels;
+  const double yTweak = (YWavMax/2) /channels;
   assert(channels == wavedrawers.size());
   unsigned i=0;
   for (std::vector<WaveDraw>::iterator it = wavedrawers.begin(); it != wavedrawers.end(); ++it,++i) {
@@ -864,21 +873,34 @@ void drawWaveform()
     it->scaleWavAim = scaleWavFromSampmax(std::max(abs(xmin), abs(xmax)));
 
     glPushMatrix();
-      // The Y-extent of a monophonic waveform is YTick * [2..6].
-      // 0..1 height is then (YTick*6 - YTick*2)/2 = YTick*2.
-      // 0..1 height is then (YWavMax - YTick*2)/2 = YWavMax/2 - YTick
+      // The Y-extent of a monophonic waveform is 0 .. yBetweenWaveformAndFeatures.
+      // 0..1 height is then yBetweenWaveformAndFeatures/2.
+      // 0..1 height is then YWavMax/2.
 
       // Draw channels from top to bottom.
-      const double centerOfChannel = YTick*2.0 + heightPerChannel*0.5 + (channels-1-i)*heightPerChannel;
+      const double centerOfChannel = heightPerChannel*0.5 + (channels-1-i)*heightPerChannel;
       glTranslated(0.0, centerOfChannel, 0.0);
       glScaled(1.0, yTweak, 1.0);
       // Scaled waveform is dark echo behind bright unscaled one.
       // getbatch()'s last arg avoids vanishingly short vertical lines, which would render as a missing horizontal line.
-      float minmaxes[4000*2]; // 4000 hardcoded
-      assert(4000 > pixelSize[0]);
+      float minmaxes[9000*2]; // 9000 hardcoded
+      assert(9000 > pixelSize[0]);
+
       it->cacheWav->getbatch(minmaxes, tShow[0], tShow[1], pixelSize[0], 0.5/(it->scaleWav * pixelSize[1])/yTweak);
+      // When zoomed in so only a thin dark line is barely visible, make this an area by extending each minmax to zero.
+      // For example, [.2,.3] becomes [0,.3];  [-.8,-.4] becomes [-.8,0];  [-.1,.1] is unchanged.
+      // (Even prettier would be to extend only to the scaleWavDefault curve, instead of all the way to the x-axis.)
+      for (int x = 0; x < pixelSize[0]; ++x) {
+	float& yMin = minmaxes[x*2];
+	float& yMax = minmaxes[x*2+1];
+	if (yMin > 0.0) yMin = 0.0;
+	if (yMax < 0.0) yMax = 0.0;
+      }
       drawWaveformScaled(minmaxes, it->scaleWav);
-      it->cacheWav->getbatch(minmaxes, tShow[0], tShow[1], pixelSize[0], 0.5/(scaleWavDefault         * pixelSize[1])/yTweak);
+
+      // Bug in cache?  When multichannel and only partially zoomed in (>1 value per x-pixel), lines are sometimes dotted.
+      // But increasing 0.5 makes the lines so fat that they're ugly.
+      it->cacheWav->getbatch(minmaxes, tShow[0], tShow[1], pixelSize[0], 0.5/(scaleWavDefault * pixelSize[1])/yTweak/yZoom);
       drawWaveformScaled(minmaxes, scaleWavDefault);
     glPopMatrix();
   }
@@ -891,16 +913,9 @@ void drawMouseRuler()
   const double xR = xL + 0.06;
   if (xR < 0.0 || xL > 1.0)
     return; // offscreen
-  const double yMid = YTick * 6;
-  // Behind waveform.  Don't distort HTK colors.
-  glBegin(GL_POLYGON);
-    glColor3d(0.12,0,0.12);
-    glVertex2d(xL, 0.0);
-    glVertex2d(xL, yMid);
-    glColor3d(0,0,0);
-    glVertex2d(xR, yMid);
-    glVertex2d(xR, 0.0);
-  glEnd();
+  // (Abandoned purple horizontal fade to right of sharp line,
+  // because multichannel might interleave waveforms and heatmap features.)
+
   // Sharp onset, drawn after polygons so it's over them.
   glColor3f(1,0,1); // purple
   glBegin(GL_LINE_STRIP);
@@ -915,7 +930,7 @@ public:
     _fadeStep(1.0/fadeFrames), _t(-1.0) {
     memset(_color, 0, sizeof(_color));
   };
-  void blink(double t, float r, float g, float b) {
+  void blink(const double t, const float r, const float g, const float b) {
     _t = t;
     _color[0] = _colorFaded[0] = r;
     _color[1] = _colorFaded[1] = g;
@@ -956,15 +971,14 @@ private:
   float _color[4];
   float _colorFaded[4];
 };
-Flash flashTag(10);
 Flash flashLimits[2];
 
-void limitBlink(int i)
+void limitBlink(const int i)
 {
   assert(i==0 || i==1);
   flashLimits[i].blink(tShowBound[i], 1.0f, 0.1f, 0.1f);
 }
-void zoomBlink(int i)
+void zoomBlink(const int i)
 {
   assert(i==0 || i==1);
   flashLimits[i].blink(tShow[i], 0.8f, 0.4f, 0.1f);
@@ -982,23 +996,42 @@ void aimCrop()
   }
 }
 
+void aimCropY()
+{
+  if (yAim[0] < yShowBound[0]) {
+    yAim[0] = yShowBound[0];
+    //printf("limitBlinkY(0);\n");;;;
+  }
+  if (yAim[1] > yShowBound[1]) {
+    yAim[1] = yShowBound[1];
+    //printf("limitBlinkY(1);\n");;;;
+  }
+}
+
 bool fHeld = false;			// Left  mouse button is held down.
 bool fHeldRight = false;		// Right mouse button is held down.
 bool fDrag = false;			// Mouse was left-dragged, not merely left-clicked.
 double xyMouse[2] = {0.5, 0.15};	// Mouse position in GL coords.
-double xAim = 0.0, yAim = 0.0;		// Mouse position in world coords.  Setpoint for xyMouse.
+double xMouseAim = 0.0, yMouseAim = 0.0;// Mouse position in world coords.  Setpoint for xyMouse.
+bool fReshaped = false;
 
 void aim()
 {
+  if (!fReshaped)
+    return; // pixelSize[] not yet defined
+
   double lowpass = 0.0345 * exp(67.0 * secsPerFrame);
   // Disable aim/show at slow frame rates, to avoid flicker.
   if (secsPerFrame > 1.0/30.0)
     lowpass = 1.0;
+
   if (lowpass > 1.0)
     lowpass = 1.0;
   const double lowpass1 = 1.0 - lowpass;
-  xyMouse[0] = xyMouse[0]*lowpass1 + xAim*lowpass;
-  xyMouse[1] = xyMouse[1]*lowpass1 + yAim*lowpass;
+  xyMouse[0] = xyMouse[0]*lowpass1 + xMouseAim*lowpass;
+  xyMouse[1] = xyMouse[1]*lowpass1 + yMouseAim*lowpass;
+
+  // Update tShow and tShowPrev from tAim.
 
   assert(tShowBound[0] < tShowBound[1]);
   assert(tAim[0] < tAim[1]);
@@ -1019,18 +1052,18 @@ void aim()
 
   aimCrop();
 
-  // Forbid zoom in past 100 samples, tweaked for 5 msec undersampling.
+  // Clamp zoomin, tweaked for 5 msec undersampling.
   // (This may interact with the constraint on tShowBound,
   // but any oscillation should converge.)
 
-  const double dtZoomMin = 100.0/SR * 3*80;
+  const double samplesPerPixelMin = 1.0;// For EEG, 1.0.  For audio, 100.0 * (0.005 * SR) * 3.
+  const double dtZoomMin = samplesPerPixelMin * pixelSize[0] / SR;
   const bool fZoominLimit = tAim[1] - tAim[0] < dtZoomMin;
   if (fZoominLimit) {
     const double tFixed = (tAim[0] + tAim[1]) / 2.0;
-    tAim[0] = tFixed - dtZoomMin * 0.5001;
-    tAim[1] = tFixed + dtZoomMin * 0.5001;
+    tAim[0] = tFixed - dtZoomMin * 0.50001;
+    tAim[1] = tFixed + dtZoomMin * 0.50001;
   }
-
   aimCrop();
 
   for (int i=0; i<2; ++i) {
@@ -1041,13 +1074,79 @@ void aim()
   tShowPrev[0] = tShow[0];
   tShowPrev[1] = tShow[1];
 
-  for (std::vector<WaveDraw>::iterator it = wavedrawers.begin(); it != wavedrawers.end(); ++it) {
-    it->update();
+  // Update yShow and yShowPrev from yAim.
+
+  assert(yShowBound[0] < yShowBound[1]);
+  assert(yAim[0] < yAim[1]);
+
+  // If yAim is disjoint with yShowBound (!!), pan it back into range.
+  if (yAim[0] >= yShowBound[1]) {
+    yAim[0] -= yAim[1] - yShowBound[1];
+    yAim[1] = yShowBound[1];
   }
+  else if (yAim[1] <= yShowBound[0]) {
+    yAim[1] += yShowBound[0] - yAim[0];
+    yAim[0] = yShowBound[0];
+  }
+  assert(yAim[0] < yShowBound[1]);
+  assert(yAim[1] > yShowBound[0]);
+  aimCropY();
+
+  const double dyZoomMin = 1.0 / channels;
+  const bool fZoominLimitY = yAim[1] - yAim[0] < dyZoomMin;
+  if (fZoominLimitY) {
+    // printf("Hit fZoominLimitY %.2f.\n", dyZoomMin); // aimCropY will also warn.
+    const double yFixed = (yAim[0] + yAim[1]) / 2.0;
+    yAim[0] = yFixed - dyZoomMin * 0.50001;
+    yAim[1] = yFixed + dyZoomMin * 0.50001;
+  }
+  aimCropY();
+
+  assert(yShowBound[0] <= yAim[0]);  assert(yAim[1]  <= yShowBound[1]);
+  assert(yShowBound[0] <= yShow[0]); assert(yShow[1] <= yShowBound[1]);
+
+  for (int i=0; i<2; ++i) {
+    yShow[i] = yShow[i]*lowpass1 + yAim[i]*lowpass;
+    /*if (fZoominLimitY)
+      zoomBlinkY(i);*/
+  }
+  //printf("\t\t\t\t\tyShow %.2f .. %.2f\n", yShow[0], yShow[1]);;;;
+  assert(yShowBound[0] - 1e-5 <= yShow[0]); assert(yShow[1] <= yShowBound[1] + 1e-5);
+  yShowPrev[0] = yShow[0];
+  yShowPrev[1] = yShow[1];
+
+  // todo: in Windows, try PPL's parallel_for_each.  Good for an EEG's 90+ WaveDraw's.
+  std::for_each(wavedrawers.begin(), wavedrawers.end(), std::mem_fun_ref(&WaveDraw::update));
+}
+
+#if 0
+void debugYCoords()
+{
+    for (double y = -1.0; y < 2.0; y += 0.01) {
+      glRasterPos2d(0.5, y);
+      char sz[80];
+      sprintf(sz, "%.2f", y);
+      putsGlut(sz);
+    }
+}
+#endif
+
+void scrollwheelY(double y, const bool fIn)
+{
+  // Undo yTimeline transformation: map 0..1 to yTimeline..1.
+  y = (y - yTimeline) / (1.0-yTimeline);
+  const double yFixed = yFromGL(y);
+  assert(yShow[0] <= yFixed);
+  assert(yFixed <= yShow[1]);
+
+  //printf("scrollY at %.3f, yFixed %.3f\n", y, yFixed);;;;
+  const double zoom = fIn ? 1.0/1.08 : 1.08; // Smaller than for x aka t, because range is also smaller.
+  yAim[0] = yFixed + (yAim[0]-yFixed) * zoom;
+  yAim[1] = yFixed + (yAim[1]-yFixed) * zoom;
 }
 
 // later, increase step for successive steps in same direction, resetting this after 0.5 seconds elapse.
-void scrollwheel(double x, bool fIn, bool fFast)
+void scrollwheel(const double x, const bool fIn, const bool fFast)
 {
   const double tFixed = secondFromGL(x);
   double zoom = fFast ? 1.14 : 1.19;	// fFast is actually reversed.  hold key down, vs mouse wheel.
@@ -1120,7 +1219,6 @@ void drawTimeline()
     glBindTexture(GL_TEXTURE_2D, texNoise);
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
     glPushMatrix();
-      glScaled(1.0, YTick*2, 1.0);
       glBegin(GL_QUADS);
       for (i=0; i<diFew; ++i) {
 	const double* p = uua[i];
@@ -1153,40 +1251,18 @@ void drawCursors()
 bool vfQuit = false;
 
 double xyPanPrev[2] = {0.0, 0.0};
-inline double xFromMouse(double xM) { return       xM/pixelSize[0]; }
-inline double yFromMouse(double yM) { return 1.0 - yM/pixelSize[1]; }
+inline double xFromMouse(const double xM) { return       xM/pixelSize[0]; }
+inline double yFromMouse(const double yM) { return 1.0 - yM/pixelSize[1]; }
 
-int itagShow = 0;
-double rgtagShow[90000]; // buffer overflow
-
-void drawTags()
+void keyboard(const unsigned char key, const int x, int /*y*/)
 {
-  // copypaste from drawCursors.
-  glColor3f(1.0, 1.0, 1.0);
-  glBegin(GL_LINES);
-  for (int i=0; i<itagShow; ++i) {
-    const double s = rgtagShow[i];
-    const double x = glFromSecond(s);
-    if (x < -0.01 || x > 1.0)
-      continue;
-    glVertex2d(x, YTick*2);
-    glVertex2d(x, 1.0);
-  }
-  glEnd();
-}
+  if (!fReshaped)
+    return; // pixelSize[] not yet defined
 
-void keyboard(unsigned char key, int x, int /*y*/)
-{
   // Fraction of horizontal screen to pan, per frame.
   // Slow enough to let user react to what they see, when holding key down.
   // Fast enough to not be tedious, requiring multiple keystrokes when investigating in detail.
   const double panspeed = 0.25;
-
-  // When playing, tags apply to the starting point (which might have been moved offscreen).
-  double rgs[2] = {0,0};
-  double sTag = s2s.sPlayCursors(rgs) ? rgs[0] : sMouseRuler;
-  if (sTag < 0.0)
-    sTag = 0.0;
 
   switch(key) {
     case 3: // ctrl+C
@@ -1234,64 +1310,77 @@ void keyboard(unsigned char key, int x, int /*y*/)
 }
 
 bool vfFakeDrag = false;
-void drag(int x, int y)
+void drag(const int x, const int y)
 {
-  static double xDrag = -1.0;
-  if (xDrag < 0.0) {
-    xDrag = x;
-  }
-  xDrag = x;
+  if (!fReshaped)
+    return; // pixelSize[] not yet defined
+
   // Mouse may not have actually moved, if called from button callback.
 
   if (fHeld) {
-    xAim = xFromMouse(x);
-    yAim = yFromMouse(y);
-    const double xpanNew = xAim;
-    const double dsec = dsecondFromGL(xyPanPrev[0] - xpanNew);
+    xMouseAim = xFromMouse(x);
+    const double xpan = xMouseAim;
+    const double dsec = dsecondFromGL(xyPanPrev[0] - xpan);
     tAim[0] += dsec;
     tAim[1] += dsec;
-    xyPanPrev[0] = xpanNew;
+    xyPanPrev[0] = xpan;
+
+    yMouseAim = yFromMouse(y);
+    const double ypan = yMouseAim;
+    const double dy = dyFromGL(xyPanPrev[1] - ypan);
+    yAim[0] += dy;
+    yAim[1] += dy;
+    xyPanPrev[1] = ypan;
+
     fDrag |= !vfFakeDrag; // distinguish left click from left drag
   }
   if (fHeldRight)
     sMouseRuler = secondFromGL(xFromMouse(x));
-#ifdef UNUSED
-  if (fHeld || fHeldRight)
-    xyPanPrev[1] = yFromMouse(y);
-#endif
+
   // If you're dextrous enough to drag while holding both buttons, feel free to do so.
 }
 
-void mouse(int button, int state, int x, int y)
+void mouse(const int button, const int state, const int x, const int y)
 {
-  const int _ = 100000;
-  switch (button*_+state) {
-    case GLUT_WHEEL_UP*_+GLUT_DOWN:
-      scrollwheel(xFromMouse(x), true, false);
+  if (!fReshaped)
+    return; // pixelSize[] not yet defined
+
+  const bool fShift = (glutGetModifiers() & GLUT_ACTIVE_SHIFT) != 0;
+
+  const int _ = 100000; // switch() on button AND state
+  switch (button*_ + state) {
+    case GLUT_WHEEL_UP*_ + GLUT_DOWN:
+      if (fShift)
+	scrollwheelY(yFromMouse(y), true);
+      else
+	scrollwheel(xFromMouse(x), true, false);
       break;
-    case GLUT_WHEEL_DOWN*_+GLUT_DOWN:
-      scrollwheel(xFromMouse(x), false, false);
+    case GLUT_WHEEL_DOWN*_ + GLUT_DOWN:
+      if (fShift)
+	scrollwheelY(yFromMouse(y), false);
+      else
+	scrollwheel(xFromMouse(x), false, false);
       break;
-    case GLUT_LEFT_BUTTON*_+GLUT_DOWN:
+    case GLUT_LEFT_BUTTON*_ + GLUT_DOWN:
       fHeld = true;
       fDrag = false;
       xyMouse[0] = xyPanPrev[0] = xFromMouse(x);
       xyMouse[1] = xyPanPrev[1] = yFromMouse(y);
       break;
-    case GLUT_RIGHT_BUTTON*_+GLUT_DOWN:
+    case GLUT_RIGHT_BUTTON*_ + GLUT_DOWN:
       fHeldRight = true;
       fDrag = false;
       xyPanPrev[0] = xFromMouse(x);
       xyPanPrev[1] = yFromMouse(y);
       break;
-    case GLUT_LEFT_BUTTON*_+GLUT_UP:
+    case GLUT_LEFT_BUTTON*_ + GLUT_UP:
       if (!fDrag)
 	sMouseRuler = secondFromGL(xFromMouse(x));
         // click not drag
       fHeld = false;
       fDrag = false;
       break;
-    case GLUT_RIGHT_BUTTON*_+GLUT_UP:
+    case GLUT_RIGHT_BUTTON*_ + GLUT_UP:
       fHeldRight = false;
       fDrag = false;
       break;
@@ -1304,7 +1393,7 @@ void mouse(int button, int state, int x, int y)
 double ticked[1000][2];
 int ctick = 0;
 void tickreset() { ctick = 0; }
-void tick(double x, const char* label)
+void tick(const double x, const char* label)
 {
   if (ctick >= 1000)
     return; // silently
@@ -1314,7 +1403,7 @@ void tick(double x, const char* label)
   ++ctick;
 }
 
-bool fTickIncluded(double x, const char* label)
+bool fTickIncluded(const double x, const char* label)
 {
   const double width2 = strlen(label) * dxChar / 2.0;
   for (int i=0; i<ctick; ++i) {
@@ -1329,21 +1418,21 @@ bool fTickIncluded(double x, const char* label)
   return false;
 }
 
-void doTick(double x, const char* label)
+void doTick(const double x, const char* label)
 {
   if (fTickIncluded(x, label))
     return; // covered by another tick
   tick(x, label);
   const double width2 = strlen(label) * dxChar / 2.0;
-  glRasterPos2d(x-width2, YTick);
+  glRasterPos2d(x-width2, 0.5); // 0.5 is midway along the timeline's [0,1] y-extent.
   putsGlut(label);
 }
 
 void drawTicks()
 {
-  const int cUnit = 7;
-  const char* szTick[cUnit] = { "week", "day", "h", "10m", "m", "10s", "s" }; // ds cs ms us
-  const double secTick[cUnit] = { 7 * 86400, 86400, 3600, 600, 60, 10, 1 };   // .1 .01 .001 1e-6
+  const int cUnit = 11;
+  const char* szTick[cUnit] = { "week", "day", "h", "10m", "m", "10s", "s", "s/10", "s/100", "ms", "us" };
+  const double secTick[cUnit] = { 7 * 86400, 86400, 3600, 600, 60, 10, 1, .1, .01, .001, 1e-6 };
   // Sadly, no standard units fill the gaps between h and m, m and s, ms and us.
   const double gl0 = glFromSecond(0);
 
@@ -1379,7 +1468,7 @@ void drawTicks()
   }
 }
 
-void reshape(int w, int h)
+void reshape(const int w, const int h)
 {
   glViewport(0, 0, pixelSize[0]=w, pixelSize[1]=h);
   // Assume monospace.
@@ -1388,11 +1477,11 @@ void reshape(int w, int h)
   glLoadIdentity();
   gluOrtho2D(0,1, 0,1);
   glMatrixMode(GL_MODELVIEW);
+  fReshaped = true;
 }
 
 void drawThumb()
 {
-  const double yTop = YTick * 0.9;
   const double dt = tShowBound[1] - tShowBound[0];
   double x0 = std::max(0.0, (tShow[0] - tShowBound[0]) / dt);
   assert(pixelSize[0] > 0);
@@ -1414,6 +1503,7 @@ void drawThumb()
 
   // fade out top edge, so thumb doesn't look manipulable.
   glBegin(GL_QUADS);
+    const double yTop = 0.45; // [0,1] is the timeline's y-extent.
     // background
     glColor4d(0.0,1,0.0, 0.3);
     glVertex2d(1.0, 0.0);
@@ -1431,11 +1521,13 @@ void drawThumb()
   glEnd();
 }
 
-// Simpler and faster than a variadic function using va_list and va_start.
-#define printf_safe(...) snprintf(sprintfbuf, sizeof(sprintfbuf), __VA_ARGS__)
-
 void drawAll()
 {
+  if (!fReshaped) {
+    // Still starting up.  Window manager hasn't set the window size yet.
+    return;
+  }
+
   const double t = appnow();
   const double dt = t - tFPSPrev;
   // dt==0 is possible on Windows, but not on Linux.
@@ -1450,17 +1542,40 @@ void drawAll()
   }
 
   glClear(GL_COLOR_BUFFER_BIT);
-  drawFeatures();
-  drawMouseRuler();
-  drawWaveform();
-  drawTimeline();
-  drawTicks();
-  drawThumb();
-  flashTag.draw();
+
+  // Convert yShow[0], yShow[1] to dy, yZoom.
+  const double dy = yShow[0];
+  yZoom = 1.0 / (yShow[1] - yShow[0]); // used by drawWaveform().  Better would be for drawWaveform() to call dyFromOpengl().
+
+  glPushMatrix();
+    // Map y-range 0..1 to yTimeline..1.
+    glTranslated(0.0, yTimeline, 0.0);
+    glScaled(1.0, 1.0-yTimeline, 1.0);
+
+    // Show yShow[0]..yShow[1].
+    glScaled(1.0, yZoom, 1.0);
+    glTranslated(0.0, -dy, 0.0);
+
+    // Draw in unit square.  x and y both from 0 to 1.
+    drawFeatures();
+    drawMouseRuler();
+    drawWaveform();
+    // debugYCoords();
+  glPopMatrix();
+
+  glPushMatrix();
+    // Map y-range 0..1 to 0..yTimeline.
+    glScaled(1.0, yTimeline, 1.0);
+
+    // Draw in unit square.  x and y both from 0 to 1.
+    drawTimeline();
+    drawTicks();
+    drawThumb();
+  glPopMatrix();
+
   flashLimits[0].draw();
   flashLimits[1].draw();
   drawCursors();
-  drawTags();
   glutSwapBuffers();
   aim();
 }
@@ -1471,7 +1586,7 @@ inline float drand48() { return float(rand()) / float(RAND_MAX); }
 
 void makeTextureNoise()
 {
-  const int w = 2048; // Wider than widest window.
+  const int w = 4096; // Wider than widest window.
   const int h = 8;
   float a[w*h];
   for (int i=0; i<w*h; ++i) a[i] = drand48();
@@ -1484,7 +1599,7 @@ void makeTextureNoise()
 extern void rtaudioInit(), rtaudioTick(const short*, int), rtaudioPause(bool), rtaudioTerm();
 extern int rtaudioBuf();
 int isKicked = 0; // how many more samples producer needs right now
-void kickProducer(int is) {
+void kickProducer(int /*is*/) {
 	//isKicked = is;
 }
 
@@ -1519,9 +1634,9 @@ void samplereader(void*) {
 
 #else
 void* samplereader(void*) {
-  extern void alsaInit(), alsaTick(const short*, ssize_t), alsaTerm();
+  extern void alsaInit(unsigned), alsaTick(const short*, ssize_t), alsaTerm();
   extern int alsaBuf();
-  alsaInit();
+  alsaInit(SR);
 
   vlockAudio.lock();
     vnumSamples = alsaBuf();
@@ -1615,7 +1730,8 @@ int main(int argc, char** argv)
   }
   //printf("%ld frames, %d SR, %d channels, %x format, %d sections, %d seekable\n",
   //  long(sfinfo.frames), sfinfo.samplerate, sfinfo.channels, sfinfo.format, sfinfo.sections, sfinfo.seekable);
-  if (sfinfo.samplerate != SR || sfinfo.format != (SF_FORMAT_WAV|SF_FORMAT_PCM_16))
+  SR = sfinfo.samplerate;
+  if (sfinfo.format != (SF_FORMAT_WAV|SF_FORMAT_PCM_16))
     warn("wavfile has unexpected format");
   wavcsamp = long(sfinfo.frames);
   channels = sfinfo.channels;
@@ -1709,13 +1825,10 @@ int main(int argc, char** argv)
   printf("\nHow to use:\n\
 	Pan or zoom       : w a s d\n\
 			  : left click or drag\n\
-			  : scrollwheel\n\
+			  : (shift-) scrollwheel\n\
 \n\
 	Set playback cursor: right click or drag\n\
-	Play              : space\n\
-\n\
-	Tag an anomaly    : e\n\
-	Undo last tag     : q\n\
+	Play/stop         : space\n\
 \n\
 	Quit              : ctrl+C\n\n");
 

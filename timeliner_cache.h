@@ -5,8 +5,11 @@
 #define _unused(x) ((void)x)
 #endif
 
-typedef float Float;
+typedef double Float;
 typedef std::vector<Float> VD;
+// todo: Only tMin,tMax need double.  The rest of czNode can be float.
+// So split that apart, to save memory.  Pointer aliasing, probably.
+// Upgrade VD to a class, with a double tMin, double tMax, and plain old array not vector of floats.
 
 // todo: choose this at runtime from the HTK features loaded.
 const unsigned CQuartet_widthMax = 200; // 52 for filterbank, 62 for externally built saliency.  250 once made glTexImage1D fail with error 0x502.
