@@ -563,9 +563,11 @@ public:
 #ifdef NDEBUG
     _unused(slices);
 #else
+    //printf("name %s, colormap %d, period %f, slices %d, width %d, cz %d.\n", _name, _iColormap, _period, slices, _vectorsize, _cz);
     assert(slices*_vectorsize == _cz);
 #endif
-    _pz = (const float*)pch; // _cz floats
+    _pz = (const float*)pch; // _cz floats.  Not doubles.
+    assert(std::isnormal(*_pz) || *_pz == 0.0);
   };
 
   bool fValid() const { return _fValid; }
@@ -600,7 +602,8 @@ public:
       if (width > unsigned(widthLim)) assert(width%widthLim==0);	// everything is a power of two
       cchunk = width<unsigned(widthLim) ? 1 : width/widthLim;
       //printf("width = %d, cchunk = %d, widthLim = %d\n", width, cchunk, widthLim);
-      assert(GLint(width/cchunk) == widthLim);
+      if (width >= unsigned(widthLim))
+	assert(GLint(width/cchunk) == widthLim);
     }
 
     rgTex.resize(cchunk);

@@ -150,6 +150,8 @@ std::string writeHTKWavelet(const int channel, const std::string& fileOut, const
 #endif
 }
 
+long wavcsamp_fake = -1;
+int channels_fake = -1;
 unsigned channels = 1;  // mono, stereo, etc
 int numchans = 62; // frequency bands per filterbank, mfcc, or wavelet
 const float sampPeriodF = 100000.0;
@@ -204,8 +206,13 @@ std::string htkFromWav(const int channel, const int iKind, const std::string& in
     quit("no wav file");
 #endif
   }
-  if (wavcsamp != sf_writef_short(pf, rawS16[channel], wavcsamp))
-    quit("failed to write " + channelfile);
+  if (channels_fake < 0) channels_fake = channels;
+  if (wavcsamp_fake < 0) wavcsamp_fake = wavcsamp;
+  printf("channel %d of %d\n", channel, channels_fake);;;;
+  const sf_count_t c = sf_writef_short(pf, rawS16[channel], wavcsamp_fake);
+  if (wavcsamp_fake != c) {
+    quit("problem writing 1-channel .wav file " + channelfile);
+  }
   if (0 != sf_close(pf))
     warn("failed to close wav");
 
@@ -281,7 +288,11 @@ void readHTK(const std::string& caption, const std::string& filename,
     if (data[i] < zMin) zMin = data[i];
     if (data[i] > zMax) zMax = data[i];
   }
-  const float dz = zMax - zMin;
+  float dz = zMax - zMin;
+  if (dz <= 0.0) {
+    // data[] is constant.
+    dz = 1.0;
+  }
   for (i=0; i<cz; ++i)
     data[i] = (data[i] - zMin) / dz;
 
@@ -312,9 +323,23 @@ public:
     std::cout << "Constructing feature from channel " << channel << " of kind " << iColormap << " with caption " << caption << "\n";
     const std::string htkFilename = htkFromWav(channel, m_iColormap, filename);
     readHTK(caption, htkFilename, m_period, m_vectorsize, m_data, m_cz);
+    validate();
     if (0 != remove(htkFilename.c_str()))
       warn("failed to remove " + htkFilename);
   }
+
+  void validate() const
+  {
+#ifndef NDEBUG
+    for (int i=0; i<m_cz; ++i) {
+      if (!std::isnormal(m_data[i]) && m_data[i] != 0.0) {
+	printf("Feature's float %d of %d is bogus: class %d, value %f\n", i, m_cz, std::fpclassify(m_data[i]), m_data[i]);
+	quit("");
+      }
+    }
+#endif
+  }
+
   // Caller must delete[] pb and pz.
   void binarydump(char*& pb, long& cb, float*& pz, long& cz)
   {
@@ -570,12 +595,11 @@ int main(int argc, char** argv)
     //   After the header comes a sequence of blocks.
     //   Each block is a concatenation of "channels" sequences of shorts.
 
-    const int channels_fake = 15; // channels;
-
     wavcsamp = numRecords * samplesPerRecord;
     numRecords /= 1000; info("debug: reading a fraction of the data");
-    const long wavcsamp_fake = numRecords * samplesPerRecord;
+    wavcsamp_fake = numRecords * samplesPerRecord;
 
+    channels_fake = 9; // channels;
     short* wavsamples = new short[wavcsamp_fake * channels_fake];
 
     // Interleave samples, from within each Record, into wavsamples[].
@@ -610,7 +634,7 @@ int main(int argc, char** argv)
 #endif
     }
     if (wavcsamp_fake != sf_writef_short(pf, wavsamples, wavcsamp_fake))
-      quit("failed to write " + mixedfile);
+      quit("problem writing mixed-wav file " + mixedfile);
     if (0 != sf_close(pf))
       warn("failed to close wav file");
 
@@ -646,7 +670,7 @@ int main(int argc, char** argv)
       warn("Config file " + configfile + ": ignoring line starting with negative feature-type index: " + *it);
       continue;
     }
-    for (unsigned chan=0; chan<channels; ++chan) {
+    for (unsigned chan=0; chan<channels_fake; ++chan) {
       std::cout << "Constructing a feature from channel " << chan << " of kind " << iColormap << " from source " << wavSrc << " with caption " << caption << "\n"; // << " and " << tokens.size() << " more args\n";
       const Feature feat(chan, iColormap, wavSrc, caption);
       filename[8] = '0' + i;
