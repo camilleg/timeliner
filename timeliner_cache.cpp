@@ -8,9 +8,6 @@
 
 #undef VERBOSE
 
-static inline Float zmin(Float a, Float b) { return a<b ? a : b; }
-static inline Float zmax(Float a, Float b) { return a>b ? a : b; }
-
 // Computing thousands of these per frame is faster than gigabytes of trivial lookup tables (see "Shrunk").
 inline Float TFromIleaf(unsigned long is, const Float hz)
 {
@@ -29,6 +26,7 @@ CHello::~CHello() {
 }
 
 // Exact 200-line copypaste between float* aSrc and int* aSrc.
+// Yes, float* not Float*.
 CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const unsigned SUB, const int widthArg) :
   fShrunkleaves(SUB == 1),
   hz(hzArg),
@@ -62,7 +60,7 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
   const unsigned cLeaves = cs / width / SUB;
 #ifdef VERBOSE
   if (cLeaves > 500000) {
-    std::cout << "alloc " << cLeaves << " leaves";
+    std::cout << "Alloc " << cLeaves << " leaves";
     if (SUB > 1)
       std::cout << ", undersampled " << SUB << "x down to " << hz/SUB << " Hz.";
     std::cout << "\n";
@@ -78,16 +76,21 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
 
         VD::iterator pz = layers->back()->begin();
   const VD::iterator pzMax = layers->back()->end();
+  // float not Float
   const float* iSrc = aSrc;
   const float* const iSrcMax = aSrc + cs;
 
   if (fShrunkleaves) {
     assert(long(layers->back()->size()) == cs);
-    unsigned c = 0;
     // Both tests are needed, lest pz overflow.  (Compiler bug??)
-    while (iSrc != iSrcMax && pz != pzMax) {
+    unsigned c;
+    for (c=0; iSrc != iSrcMax && pz != pzMax; ++c) {
+#ifndef NDEBUG
+      if (!std::isnormal(*iSrc) && *iSrc != 0.0) {
+	printf("warning: invalid floating-point value %f.\n", *iSrc);
+      }
+#endif
       *pz++ = Float(*iSrc++);
-      ++c;
     }
     assert(c == cLeaves*width);
   } else {
@@ -188,9 +191,9 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
 	  const Float& z1 = L[j+iVector];
 	  const Float& z2 = L[k+iVector];
 
-	  const Float _min = *pz++ = zmin(z1,  z2);
+	  const Float _min = *pz++ = std::min(z1,  z2);
 	  const Float _mean = *pz++ = (z1 + z2) * 0.5F;
-	  const Float _max = *pz++ = zmax(z1,  z2);
+	  const Float _max = *pz++ = std::max(z1,  z2);
 	  assert(0.0 <= _min); // for htk
 	  assert(_min <= _mean);
 	  assert(_mean <= _max);
@@ -260,6 +263,9 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
 	{
 	  for (unsigned _=0; _<width; ++_) {
 	    const int __ = _*3;
+	    assert(!isnan(L[j+__+3]));
+	    assert(!isnan(L[j+__+4]));
+	    assert(!isnan(L[j+__+5]));
 	    assert(L[j+__+3] <= L[j+__+4]); // min <= mean
 	    assert(L[k+__+3] <= L[k+__+4]); // min <= mean
 	    assert(L[j+__+4] <= L[j+__+5]); // mean <= max
@@ -278,9 +284,9 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
 	assert(_numEls >= 1.9); // For division by zero, but even stronger than != 0.
 	for (unsigned _=0; _<width; ++_) {
 	  const int __ = _*3;
-	  const Float _min  = *pz++ = zmin(L[j+__+3], L[k+__+3]);
+	  const Float _min  = *pz++ = std::min(L[j+__+3], L[k+__+3]);
 	  const Float _mean = *pz++ = Float((L[j+2]*double(L[j+__+4]) + L[k+2]*double(L[k+__+4])) / _numEls);
-	  const Float _max  = *pz++ = zmax(L[j+__+5], L[k+__+5]);
+	  const Float _max  = *pz++ = std::max(L[j+__+5], L[k+__+5]);
 	  assert(_min <= _mean);
 	  assert(_mean <= _max);
 #ifdef NDEBUG
@@ -466,9 +472,9 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
 	  const Float& z1 = L[j+iVector];
 	  const Float& z2 = L[k+iVector];
 
-	  const Float _min = *pz++ = zmin(z1,  z2);
+	  const Float _min = *pz++ = std::min(z1,  z2);
 	  const Float _mean = *pz++ = (z1 + z2) * 0.5F;
-	  const Float _max = *pz++ = zmax(z1,  z2);
+	  const Float _max = *pz++ = std::max(z1,  z2);
 	  // These lie in [0,1] if this is an HTK feature,
 	  // but only in [SHRT_MIN,SHRT_MAX] if this is fShrunkLeaves .wav data.
 	  assert(_min <= _mean);
@@ -556,9 +562,9 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
 	assert(_numEls >= 1.9); // For division by zero, but even stronger than != 0.
 	for (unsigned _=0; _<width; ++_) {
 	  const int __ = _*3;
-	  const Float _min  = *pz++ = zmin(L[j+__+3], L[k+__+3]);
+	  const Float _min  = *pz++ = std::min(L[j+__+3], L[k+__+3]);
 	  const Float _mean = *pz++ = Float((L[j+2]*double(L[j+__+4]) + L[k+2]*double(L[k+__+4])) / _numEls);
-	  const Float _max  = *pz++ = zmax(L[j+__+5], L[k+__+5]);
+	  const Float _max  = *pz++ = std::max(L[j+__+5], L[k+__+5]);
 	  assert(_min <= _mean);
 	  assert(_mean <= _max);
 #ifdef NDEBUG
@@ -599,9 +605,9 @@ static inline const CQuartet merge_for_recurse(const CQuartet& a, const CQuartet
   if (w == 1)
     return CQuartet(
       numEls,
-      zmin(a[1], b[1]),
+      std::min(a[1], b[1]),
       (a[0]*a[2] + b[0]*b[2]) / numEls,
-      zmax(a[3], b[3]));
+      std::max(a[3], b[3]));
 
   static Float t[1+CQuartet_widthMax*3];
   t[0] = numEls;
@@ -613,9 +619,9 @@ static inline const CQuartet merge_for_recurse(const CQuartet& a, const CQuartet
     assert(a[di+1] <= a[di+2]);
     assert(b[di+0] <= b[di+1]);
     assert(b[di+1] <= b[di+2]);
-    t[di+0] = zmin(a[di+0], b[di+0]);
+    t[di+0] = std::min(a[di+0], b[di+0]);
     t[di+1] = Float((a[0]*double(a[di+1]) + b[0]*double(b[di+1])) / numEls); // double avoids roundoff error
-    t[di+2] = zmax(a[di+2], b[di+2]);
+    t[di+2] = std::max(a[di+2], b[di+2]);
     assert(t[di+0] <= t[di+1]);
     assert(t[di+1] <= t[di+2]);
   }
