@@ -95,8 +95,9 @@ class CQuartet {
       memcpy(a, rhs, (1 + width*3) * sizeof(Float));
       for (unsigned j=0; j<width; ++j) {
 	assert(0.0 <= a[3*j+1]); // for htk
-	assert(a[3*j+1] <= a[3*j+2]);
-	assert(a[3*j+2] <= a[3*j+3]);
+	const Float epsilon = 1e-5;
+	assert(a[3*j+1] <= a[3*j+2] + epsilon);
+	assert(a[3*j+2] <= a[3*j+3] + epsilon);
 	assert(a[3*j+3] <= 1.0); // for htk
       }
     }

@@ -260,16 +260,17 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
 	assert(L[j+2] >= 1.0);    // at least 1 element
 	assert(L[k+2] >= 1.0);    // at least 1 element
 
+	const Float epsilon = 1e-5;
 	{
 	  for (unsigned _=0; _<width; ++_) {
 	    const int __ = _*3;
 	    assert(!isnan(L[j+__+3]));
 	    assert(!isnan(L[j+__+4]));
 	    assert(!isnan(L[j+__+5]));
-	    assert(L[j+__+3] <= L[j+__+4]); // min <= mean
-	    assert(L[k+__+3] <= L[k+__+4]); // min <= mean
-	    assert(L[j+__+4] <= L[j+__+5]); // mean <= max
-	    assert(L[k+__+4] <= L[k+__+5]); // mean <= max
+	    assert(L[j+__+3] <= L[j+__+4] + epsilon); // min <= mean
+	    assert(L[k+__+3] <= L[k+__+4] + epsilon); // min <= mean
+	    assert(L[j+__+4] <= L[j+__+5] + epsilon); // mean <= max
+	    assert(L[k+__+4] <= L[k+__+5] + epsilon); // mean <= max
 	  }
 	}
 #endif
@@ -287,8 +288,8 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
 	  const Float _min  = *pz++ = std::min(L[j+__+3], L[k+__+3]);
 	  const Float _mean = *pz++ = Float((L[j+2]*double(L[j+__+4]) + L[k+2]*double(L[k+__+4])) / _numEls);
 	  const Float _max  = *pz++ = std::max(L[j+__+5], L[k+__+5]);
-	  assert(_min <= _mean);
-	  assert(_mean <= _max);
+	  assert(_min <= _mean + epsilon);
+	  assert(_mean <= _max + epsilon);
 #ifdef NDEBUG
 	  _unused(_min);
 	  _unused(_mean);
@@ -615,15 +616,16 @@ static inline const CQuartet merge_for_recurse(const CQuartet& a, const CQuartet
     const unsigned di = 1+3*i;
     assert(di+2 < 1+3*w);
     // min mean max
-    assert(a[di+0] <= a[di+1]);
-    assert(a[di+1] <= a[di+2]);
-    assert(b[di+0] <= b[di+1]);
-    assert(b[di+1] <= b[di+2]);
+    const Float epsilon = 1e-5;
+    assert(a[di+0] <= a[di+1] + epsilon);
+    assert(a[di+1] <= a[di+2] + epsilon);
+    assert(b[di+0] <= b[di+1] + epsilon);
+    assert(b[di+1] <= b[di+2] + epsilon);
     t[di+0] = std::min(a[di+0], b[di+0]);
     t[di+1] = Float((a[0]*double(a[di+1]) + b[0]*double(b[di+1])) / numEls); // double avoids roundoff error
     t[di+2] = std::max(a[di+2], b[di+2]);
-    assert(t[di+0] <= t[di+1]);
-    assert(t[di+1] <= t[di+2]);
+    assert(t[di+0] <= t[di+1] + epsilon);
+    assert(t[di+1] <= t[di+2] + epsilon);
   }
   return CQuartet(w, t);
 }
