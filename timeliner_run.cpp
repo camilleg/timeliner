@@ -121,22 +121,6 @@ double appnow()
   return (t.tv_sec - t0.tv_sec) + (t.tv_usec - t0.tv_usec) / 1e6;
 }
 
-class Logger {
-public:
-  Logger(const char* filename): _o(filename) {}
-  ~Logger() { _o.close(); }
-  void warn (const std::string& _) { _log(_, 'W', " WARN"); }
-  void info (const std::string& _) { _log(_, 'I', " INFO"); }
-  void debug(const std::string& _) { _log(_, 'D', "DEBUG"); }
-private:
-  std::ofstream _o;
-  void _log(const std::string& _, char c, const char* name) {
-    _o << c << ", [" << appnow() << "] " << name << ": " << _ << "\n";
-  }
-};
-const char* logfilename = "./timeliner.log";
-Logger* applog = NULL;
-
 double tFPSPrev = appnow();
 double secsPerFrame = 1/60.0;
 
@@ -1269,7 +1253,6 @@ void keyboard(const unsigned char key, const int x, int /*y*/)
     case 3: // ctrl+C
       vfQuit = true;
       snooze(0.6); // let other threads notice vfQuit
-      delete applog;
       exit(0);
     case ' ':
       // Snap offscreen cursor back onscreen,
@@ -1707,13 +1690,10 @@ int main(int argc, char** argv)
 #endif
 
   glutInit(&argc, argv);
-  if (argc > 3)
-    quit("Usage: timeliner_run dirMarshal [logfile]");
-  if (argc >= 2)
+  if (argc > 2)
+    quit("Usage: timeliner_run dirMarshal");
+  if (argc == 2)
     dirMarshal = argv[1];
-  if (argc == 3)
-    logfilename = argv[2];
-  applog = new Logger(logfilename);
 
   const std::string wav(dirMarshal + std::string("/mixed.wav"));
   // www.mega-nerd.com/libsndfile/api.html
