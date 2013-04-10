@@ -7,8 +7,6 @@ const char *device = "plughw:0,0"; /* playback device */
 const snd_pcm_format_t format = SND_PCM_FORMAT_S16; /* sample format */
 const unsigned int rate = 16000; /* stream rate */
 const unsigned int channels = 1; /* count of channels */
-const double freq = 110; /* sinusoidal wave frequency in Hz */
-const int resample = 1; /* enable alsa-lib resampling */
 
 unsigned int buffer_time = 30000; /* ring buffer length in us: 2x or 3x period_time. */
 unsigned int period_time = 15000; /* period time in us */
@@ -83,7 +81,8 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_
         return err;
     }
     /* set hardware resampling */
-    err = snd_pcm_hw_params_set_rate_resample(handle, params, resample);
+    // Report back from alsa to timeliner the *actual* sampling rate?
+    err = snd_pcm_hw_params_set_rate_resample(handle, params, 1);
     if (err < 0) {
         printf("Resampling setup failed for playback: %s\n", snd_strerror(err));
         return err;
@@ -118,13 +117,13 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_
         return -EINVAL;
     }
     /* set the buffer time */
-    int dir;
+    int dir = 0;
     err = snd_pcm_hw_params_set_buffer_time_near(handle, params, &buffer_time, &dir);
     if (err < 0) {
         printf("Unable to set buffer time %i for playback: %s\n", buffer_time, snd_strerror(err));
         return err;
     }
-    snd_pcm_uframes_t size;
+    snd_pcm_uframes_t size = 0;
     err = snd_pcm_hw_params_get_buffer_size(params, &size);
     if (err < 0) {
         printf("Unable to get buffer size for playback: %s\n", snd_strerror(err));
@@ -239,33 +238,33 @@ void alsaInit(const unsigned SR)
     snd_pcm_sw_params_t *swparams; snd_pcm_sw_params_alloca(&swparams);
     int err = snd_output_stdio_attach(&output, stdout, 0);
     if (err < 0) {
-        printf("Output failed: %s\n", snd_strerror(err));
+        printf("timeliner ALSA Output failed: %s\n", snd_strerror(err));
         return;
     }
     if (SR != rate)
-      printf("Warning: ALSA playback overriding requested sample rate of %d Hz with hardcoded %d Hz.\n", SR, rate);
-    printf("Playback device is %s\n", device);
+      printf("timeliner ALSA Warning: ALSA playback overriding requested sample rate of %d Hz with hardcoded %d Hz.\n", SR, rate);
+    printf("timeliner ALSA Playback device is %s\n", device);
     printf("Stream parameters are %iHz, %s, %i channels\n", rate, snd_pcm_format_name(format), channels);
     if ((err = snd_pcm_open(&handle, device, SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
-        printf("Playback open error: %s\n", snd_strerror(err));
+        printf("timeliner ALSA Playback open error: %s\n", snd_strerror(err));
         return;
     }
     if ((err = set_hwparams(handle, hwparams, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) {
-        printf("Setting of hwparams failed: %s\n", snd_strerror(err));
+        printf("timeliner ALSA Setting of hwparams failed: %s\n", snd_strerror(err));
         exit(EXIT_FAILURE);
     }
     if ((err = set_swparams(handle, swparams)) < 0) {
-        printf("Setting of swparams failed: %s\n", snd_strerror(err));
+        printf("timeliner ALSA Setting of swparams failed: %s\n", snd_strerror(err));
         exit(EXIT_FAILURE);
     }
     samples = (short int*)malloc((period_size * channels * snd_pcm_format_physical_width(format)) / 8);
     if (samples == NULL) {
-        printf("Out of memory\n");
+        printf("timeliner ALSA Out of memory\n");
         exit(EXIT_FAILURE);
     }
     areas = (snd_pcm_channel_area_t*)calloc(channels, sizeof(snd_pcm_channel_area_t));
     if (areas == NULL) {
-        printf("Out of memory\n");
+        printf("timeliner ALSA Out of memory\n");
         exit(EXIT_FAILURE);
     }
     unsigned int chn;
