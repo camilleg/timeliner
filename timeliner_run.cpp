@@ -52,8 +52,6 @@ void snooze(double sec) { Sleep(DWORD(sec * 1e3)); }
 void snooze(double sec) { (void)usleep(sec * 1e6); }
 #endif
 
-inline double sq(double _) { return _*_; }
-
 #ifdef _MSC_VER
 #include <windows.h>
 #include <time.h>
@@ -535,16 +533,33 @@ public:
   int cchunk;
   std::vector<Slartibartfast> rgTex;
 
-  Feature(int /*iColormap*/, const char* filename, const char* dirname): _fValid(false) {
+  // Todo: grow this into a waveform feature, then move it into timeliner_pre.cpp.
+  Feature(): _fValid(true) {
+    _iColormap = 1; // ?
+    _vectorsize = 4; // pixel height
+    _period = 1.0/SR;	// waveform's sample rate
+    const int slices = wavcsamp;
+    _cz = slices*_vectorsize;
+    float* pz = new float[_cz];
+    for (int t=0; t < slices; ++t)
+      for (int s=0; s < _vectorsize; ++s)
+	pz[t*_vectorsize+s] = t%100<40 ? 0.0 : 0.3 + 0.69*drand48(); // test pattern
+//	pz[t*_vectorsize+s] = drand48()*0.5 + drand48()*0.5 * (float(t)/(slices-1));
+    _pz = pz;
+    strcpy(_name, "waveform for eeg");
+    makeMipmaps();
+  }
+
+  Feature(int /*iColormap*/, const std::string& filename, const std::string& dirname): _fValid(false) {
     if (mb == mbUnknown) {
       mb = gpuMBavailable() > 0.0f ? mbPositive : mbZero;
       if (!hasGraphicsRAM())
 	warn("Found no dedicated graphics RAM.  May run slowly.");
     }
-    const Mmap foo(dirname + std::string("/") + filename);
-    if (!foo.valid())
+    const Mmap marshaled_file(dirname + "/" + filename);
+    if (!marshaled_file.valid())
       return;
-    binaryload(foo.pch(), foo.cch()); // stuff many member variables
+    binaryload(marshaled_file.pch(), marshaled_file.cch()); // stuff many member variables
     makeMipmaps();
     _fValid = true;
     // ~Mmap closes file
@@ -559,15 +574,20 @@ public:
     _period = *(float*)pch;			pch += sizeof(float);
     const int slices = int(*(float*)pch);	pch += sizeof(float);
     _vectorsize = int(*(float*)pch);		pch += sizeof(float);
+    _pz = (const float*)pch; // _cz floats.  Not doubles.
     _cz = (cch - long(strlen(_name) + 1 + 4*sizeof(float))) / 4;
+    //printf("name %s, colormap %d, period %f, slices %d, width %d, cz %d.\n", _name, _iColormap, _period, slices, _vectorsize, _cz);
+    assert(slices*_vectorsize == _cz);
 #ifdef NDEBUG
     _unused(slices);
 #else
-    //printf("name %s, colormap %d, period %f, slices %d, width %d, cz %d.\n", _name, _iColormap, _period, slices, _vectorsize, _cz);
-    assert(slices*_vectorsize == _cz);
+    for (int i=0; i<_cz; ++i) {
+      if (!std::isnormal(_pz[i]) && _pz[i] != 0.0) {
+	printf("binaryload: feature's float %d of %d is bogus: class %d, value %f\n", i, _cz, std::fpclassify(_pz[i]), _pz[i]);
+	quit("");
+      }
+    }
 #endif
-    _pz = (const float*)pch; // _cz floats.  Not doubles.
-    assert(std::isnormal(*_pz) || *_pz == 0.0);
   };
 
   bool fValid() const { return _fValid; }
@@ -584,17 +604,18 @@ public:
     if (subsample < 1)
       subsample = 1;
     if (subsample > 1)
-      printf("Subsampling %dx from env var timeliner_zoom.\n", subsample);
+      printf("Subsampling %dx from environment variable timeliner_zoom.\n", subsample);
 
-    // width of texture is smallest power of two that's larger than features' # of samples.
     unsigned level;
     const int csample = samples();
-    unsigned width = 1; // could end up as large as 1048576, or far more.
+
+    // Smallest power of two that exceeds features' # of samples.
+    unsigned width = 1;
     while (width < csample/subsample)
       width *= 2;
     //printf("feature has %d samples, for tex-chunks' width %d.\n", csample, width);
 
-    // Keep cchunk no larger than needed, to conserve RAM and increase FPS.
+    // Minimize cchunk to conserve RAM and increase FPS.
     {
       GLint widthLim; // often 2048..8192 (zx81 has 8192), rarely 16384, never greater.
       glGetIntegerv(GL_MAX_TEXTURE_SIZE, &widthLim);
@@ -627,7 +648,7 @@ public:
       printf("Feature used %.1f graphics MB;  %.0f MB remaining.\n", mb0-mb1, mb1);
       if (mb1 < 50.0) {
 #ifdef _MSC_VER
-	warn("Running out of graphics RAM.  Try setting the environment variable timeliner_zoom to 10 or so, and restarting.");
+	warn("Running out of graphics RAM.  Try increasing the environment variable timeliner_zoom to 15 or so.");
 #else
 	// Less than 50 MB free may hang X.  Mouse responsive, Xorg 100% cpu, network up, console frozen.
 	warn("Running out of graphics RAM.  Try export timeliner_zoom=15.");
@@ -654,24 +675,7 @@ public:
       for (int j=0; j<vectorsize(); ++j) {
 	assert(glIsTexture(rgTex[ichunk].tex[j]) == GL_TRUE);
 	glBindTexture(GL_TEXTURE_1D, rgTex[ichunk].tex[j]);
-
-#if 0	// Fails on ubuntu tagalong and Sarah's winVista.  No idea why.
-	// Error check.  Faster would be to do this just once, with mipmaplevel==1.
-	glTexImage1D(GL_PROXY_TEXTURE_1D, mipmaplevel, GL_INTENSITY8, width, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-	GLenum e = glGetError();
-	if (e != GL_NO_ERROR) {
-	  printf("%x\n", e);
-	  quit("Oh no, glTexImage1D failed.");
-	}
-#endif
 	glTexImage1D(GL_TEXTURE_1D, mipmaplevel, GL_INTENSITY8, width, 0, GL_RED, GL_UNSIGNED_BYTE, bufByte + width*j);
-#if 0	// Fails on Sarah's winVista.  No idea why.
-	GLenum e = glGetError();
-	if (e != GL_NO_ERROR) {
-	  printf("%x\n", e); // 0x500 GL_INVALID_ENUM /usr/include/GL/gl.h
-	  quit("Oh no, glTexImage1D failed.");
-	}
-#endif
       }
     }
     delete [] bufByte;
@@ -680,9 +684,9 @@ public:
 private:
   bool _fValid;
   int _iColormap;
-  float _period;
-  int _vectorsize;
-  const float* _pz;
+  float _period;	// seconds per sample
+  int _vectorsize;	// e.g., how many frequency bins in a spectrogram
+  const float* _pz;	// _pz[0.._cz] is the (vectors of) raw data
   long _cz;
   char _name[1000];
 };
@@ -719,43 +723,40 @@ void drawFeatures()
   double rgy[100]; //hardcoded;;
   rgy[0] = yBetweenWaveformAndFeatures;
   rgy[i] = 1.0;
-  const double rescale = sum / (rgy[i] - rgy[0]);
-  int j;
-  for (j=1; j<i; ++j)
-    rgy[j] = rgy[j-1] + rgdy[j-1] / rescale;
-  // rgy [0 .. i] are boundaries between features.
+  {
+    const double rescale = sum / (rgy[i] - rgy[0]);
+    for (int j=1; j<i; ++j)
+      rgy[j] = rgy[j-1] + rgdy[j-1] / rescale;
+    // rgy [0 .. i] are boundaries between features.
+  }
 
   for (f=features.begin(),i=0; f!=features.end(); ++f,++i) {
     const double* p = rgy + i;
       glDisable(GL_TEXTURE_2D);
       glEnable(GL_TEXTURE_1D);
-      const int jMax = (*f)->vectorsize();
       glColor4d(0.9,1.0,0.4, 1.0);
-      for (int ichunk=0; ichunk<(*f)->cchunk; ++ichunk) {
-	for (j=0; j < jMax; ++j) {
-	  const double chunkL = ichunk     / double((*f)->cchunk); // e.g., 5/8
+      const int jMax = (*f)->vectorsize();
+      for (int ichunk=0; ichunk < (*f)->cchunk; ++ichunk) {
+	for (int j=0; j<jMax; ++j) {
+	  const double chunkL =  ichunk    / double((*f)->cchunk); // e.g., 5/8
 	  const double chunkR = (ichunk+1) / double((*f)->cchunk); // e.g., 6/8
 	  const double tBoundL = lerp(chunkL, tShowBound[0], tShowBound[1]);
 	  const double tBoundR = lerp(chunkR, tShowBound[0], tShowBound[1]);
 	  const double xL = (tBoundL - tShow[0]) / (tShow[1] - tShow[0]);
 	  const double xR = (tBoundR - tShow[0]) / (tShow[1] - tShow[0]);
-	  if (xR < 0.0 || xL > 1.0)
+	  if (xR < 0.0 || 1.0 < xL)
 	    continue; // offscreen
-	  const double uL = 0.0;
-	  const double uR = 1.0;
 	  assert(glIsTexture((*f)->rgTex[ichunk].tex[j]) == GL_TRUE);
 	  glBindTexture(GL_TEXTURE_1D, (*f)->rgTex[ichunk].tex[j]);
 	  glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	  const double yMin = lerp(double(j  )/jMax, p[0], p[1]);
 	  const double yMax = lerp(double(j+1)/jMax, p[0], p[1]);
-	  assert(p[0] <= yMin);
-	  assert(yMin <  yMax);
-	  assert(yMax <= p[1]);
+	  assert(p[0]<=yMin && yMin<yMax && yMax<=p[1]);
 	  glBegin(GL_QUADS);
-	    glTexCoord1d(uL); glVertex2d(xL, yMin);
-	    glTexCoord1d(uL); glVertex2d(xL, yMax);
-	    glTexCoord1d(uR); glVertex2d(xR, yMax);
-	    glTexCoord1d(uR); glVertex2d(xR, yMin);
+	    glTexCoord1d(0.0); glVertex2d(xL, yMin);
+	    glTexCoord1d(0.0); glVertex2d(xL, yMax);
+	    glTexCoord1d(1.0); glVertex2d(xR, yMax);
+	    glTexCoord1d(1.0); glVertex2d(xR, yMin);
 	  glEnd();
 	}
       }
@@ -766,20 +767,21 @@ void drawFeatures()
   }
 }
 
-double linearlerp(const double z, const double min, const double max)
-{
-  return z*max + (1.0-z)*min;
-}
+inline double sq(double _) { return _*_; }
 
 double geometriclerp(double z, double min, double max)
 {
   if (z<0.0 || min<0.0 || max<0.0)
-    return -1.0;			// handle error arbitrarily
+    return -1.0;   // handle error arbitrarily
   z   = sqrt(z  );
   min = sqrt(min);
   max = sqrt(max);
-  const double r = (z-min) / (max-min);
-  return r*r;
+  return sq((z-min) / (max-min));
+}
+
+double linearlerp(const double z, const double min, const double max)
+{
+  return z*max + (1.0-z)*min;
 }
 
 unsigned int channels = 0; // == wavedrawers.size()
