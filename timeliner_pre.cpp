@@ -640,10 +640,9 @@ int main(int argc, char** argv)
 
     info("parsing EDF body: splitting channels");
     rawS16 = new short*[channels];
-    for (unsigned j=0; j<channels; ++j) {
+    for (unsigned j=0; j<channels_fake; ++j) {
       rawS16[j] = new short[wavcsamp_fake];
-      if (j<3)/*;;;; not using features yet, just bare wav */ memcpy(rawS16[j], ps+j*wavcsamp_fake, wavcsamp_fake*2);
-      //std::cerr << "split channel " << j << "/" << channels << "\n";
+      memcpy(rawS16[j], ps+j*wavcsamp_fake, wavcsamp_fake*2);
     }
 
   } else {
