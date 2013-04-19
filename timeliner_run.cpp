@@ -583,7 +583,7 @@ public:
 #else
     for (int i=0; i<_cz; ++i) {
       if (!std::isnormal(_pz[i]) && _pz[i] != 0.0) {
-	printf("binaryload: feature's float %d of %d is bogus: class %d, value %f\n", i, _cz, std::fpclassify(_pz[i]), _pz[i]);
+	printf("binaryload: feature's float %d of %ld is bogus: class %d, value %f\n", i, _cz, std::fpclassify(_pz[i]), _pz[i]);
 	quit("");
       }
     }
@@ -606,7 +606,6 @@ public:
     if (subsample > 1)
       printf("Subsampling %dx from environment variable timeliner_zoom.\n", subsample);
 
-    unsigned level;
     const int csample = samples();
 
     // Smallest power of two that exceeds features' # of samples.
@@ -638,7 +637,7 @@ public:
     glEnable(GL_TEXTURE_1D);
     const float mb0 = hasGraphicsRAM() ? gpuMBavailable() : 0.0f;
     // www.opengl.org/archives/resources/features/KilgardTechniques/oglpitfall/ #5 Not Setting All Mipmap Levels.
-    for (level=0; (width/cchunk)>>level >= 1; ++level) {
+    for (unsigned level=0; (width/cchunk)>>level >= 1; ++level) {
       //printf("  computing feature %d's mipmap level %d.\n", i, level);
       makeTextureMipmap(cacheHTK, level, width >> level);
     }
@@ -753,10 +752,8 @@ void drawFeatures()
 	  const double yMax = lerp(double(j+1)/jMax, p[0], p[1]);
 	  assert(p[0]<=yMin && yMin<yMax && yMax<=p[1]);
 	  glBegin(GL_QUADS);
-	    glTexCoord1d(0.0); glVertex2d(xL, yMin);
-	    glTexCoord1d(0.0); glVertex2d(xL, yMax);
-	    glTexCoord1d(1.0); glVertex2d(xR, yMax);
-	    glTexCoord1d(1.0); glVertex2d(xR, yMin);
+	    glTexCoord1d(0.0); glVertex2d(xL, yMin); glVertex2d(xL, yMax);
+	    glTexCoord1d(1.0); glVertex2d(xR, yMax); glVertex2d(xR, yMin);
 	  glEnd();
 	}
       }
