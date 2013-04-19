@@ -455,9 +455,23 @@ int pixelSize[2] = {1000,1000};
 double dxChar = 0.01;
 #define font GLUT_BITMAP_9_BY_15
 
-// As z from 0 to 1, lerp from a to b.
-inline float lerp(const float z, const float a, const float b) { return z*b + (1.0F-z)*a; }
-inline double lerp(const double z, const double a, const double b) { return z*b + (1.0-z)*a; }
+double sq(double _) { return _*_; }
+
+// As z from 0 to 1, lerp from min to max.
+double geometriclerp(double z, double min, double max)
+{
+  if (z<0.0 || min<0.0 || max<0.0)
+    return -1.0;   // handle error arbitrarily
+  z   = sqrt(z  );
+  min = sqrt(min);
+  max = sqrt(max);
+  return sq((z-min) / (max-min));
+}
+
+double lerp(const double z, const double min, const double max)
+{
+  return z*max + (1.0-z)*min;
+}
 
 // To set color: *before* glRasterPos2d, call glColor (with lighting disabled).
 char sprintfbuf[10000];
@@ -764,23 +778,6 @@ void drawFeatures()
   }
 }
 
-inline double sq(double _) { return _*_; }
-
-double geometriclerp(double z, double min, double max)
-{
-  if (z<0.0 || min<0.0 || max<0.0)
-    return -1.0;   // handle error arbitrarily
-  z   = sqrt(z  );
-  min = sqrt(min);
-  max = sqrt(max);
-  return sq((z-min) / (max-min));
-}
-
-double linearlerp(const double z, const double min, const double max)
-{
-  return z*max + (1.0-z)*min;
-}
-
 unsigned int channels = 0; // == wavedrawers.size()
 
 // Convert 0..32768 to what drawWaveformScaled() will scale the waveform by.  (bug: for actual pixels, consider yTimeline too? *=(1-yTimeline) ?)
@@ -826,7 +823,7 @@ void drawWaveformScaled(const float* minmaxes, const double yScale) {
   double ramp = yScale==scaleWavDefault ? 1.0 :
     (0.85/yScale - 5000.0) / (33100.0 - 5000.0) / 11.0; // 1.0 downto 0.009
   ramp = std::max(ramp, 0.44); // Not too dark.
-  glColor4d(linearlerp(ramp,0.07,0.1), geometriclerp(ramp,0.15,1.0), linearlerp(ramp,0.06,0.15), 1.0);
+  glColor4d(lerp(ramp,0.07,0.1), geometriclerp(ramp,0.15,1.0), lerp(ramp,0.06,0.15), 1.0);
   glPushMatrix();
     glScaled(1.0/pixelSize[0], yScale, 1.0);
     glBegin(GL_LINES);
