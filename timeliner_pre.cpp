@@ -640,7 +640,7 @@ int main(int argc, char** argv)
 
     info("parsing EDF body: splitting channels");
     rawS16 = new short*[channels];
-    for (unsigned j=0; j<channels_fake; ++j) {
+    for (int j=0; j<channels_fake; ++j) {
       rawS16[j] = new short[wavcsamp_fake];
       memcpy(rawS16[j], ps+j*wavcsamp_fake, wavcsamp_fake*2);
     }
@@ -669,7 +669,7 @@ int main(int argc, char** argv)
       warn("Config file " + configfile + ": ignoring line starting with negative feature-type index: " + *it);
       continue;
     }
-    for (unsigned chan=0; chan<channels_fake; ++chan) {
+    for (int chan=0; chan<channels_fake; ++chan) {
       std::cout << "Constructing a feature from channel " << chan << " of kind " << iColormap << " from source " << wavSrc << " with caption " << caption << "\n"; // << " and " << tokens.size() << " more args\n";
       const Feature feat(chan, iColormap, wavSrc, caption);
       filename[8] = '0' + i;

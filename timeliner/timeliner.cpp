@@ -3,11 +3,11 @@
 
 #include "stdafx.h"
 
-extern int main(int argc, char* argv[]);
+extern int mainCore(int argc, char** const argv);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-// todo: use stackoverflow recipe to convert TCHAR to char, so this will actually run.  Sigh.
-	return main(0, NULL);
+    // For this to run, disable unicode: config properties, general, project defaults, character set, "not set".
+	return mainCore(0, NULL);
 }
 

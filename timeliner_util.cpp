@@ -12,7 +12,9 @@
 #ifdef _MSC_VER
 
 Mmap::Mmap(const std::string& szFilename, const bool fOptional) : _pch(NULL) {
-    h = CreateFile( std::wstring(szFilename.begin(), szFilename.end()).c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+// Disable unicode: config properties, general, project defaults, character set, "not set".
+//  h = CreateFile( std::wstring(szFilename.begin(), szFilename.end()).c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    h = CreateFileA( (LPCSTR)szFilename.c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (h == INVALID_HANDLE_VALUE) {
       if (!fOptional)
 	    warn("mmap: problem opening file" + szFilename);

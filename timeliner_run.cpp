@@ -36,6 +36,11 @@
 #include <sndfile.h>
 #include <vector>
 
+// Linux: apt-get install libglew-dev
+// Windows: http://glew.sourceforge.net/install.html
+#ifdef _MSC_VER
+#define GLEW_STATIC
+#endif
 #define GLEW_BUILD
 #include <GL/glew.h> // before gl.h
 #include <GL/glut.h>
@@ -534,6 +539,10 @@ float gpuMBavailable()
   // 8 chunks is 23 MB.  But 145MB is used?!  (RGBA not just RGB?)
 }
 
+#ifdef _MSC_VER
+inline float drand48() { return float(rand()) / float(RAND_MAX); } 
+#endif
+
 class Feature {
 
   enum { vecLim = CQuartet_widthMax+1 }; // from timeliner_cache.h
@@ -553,13 +562,13 @@ public:
   Feature(): _fValid(true) {
     _iColormap = 1; // ?
     _vectorsize = 4; // pixel height
-    _period = 1.0/SR;	// waveform's sample rate
+    _period = 1.0f/SR;	// waveform's sample rate
     const int slices = wavcsamp;
     _cz = slices*_vectorsize;
     float* pz = new float[_cz];
     for (int t=0; t < slices; ++t)
       for (int s=0; s < _vectorsize; ++s)
-	pz[t*_vectorsize+s] = t%100<40 ? 0.0 : 0.3 + 0.69*drand48(); // test pattern
+	pz[t*_vectorsize+s] = t%100<40 ? 0.0f : 0.3f + 0.69f*drand48(); // test pattern
 //	pz[t*_vectorsize+s] = drand48()*0.5 + drand48()*0.5 * (float(t)/(slices-1));
     _pz = pz;
     strcpy(_name, "waveform for eeg");
@@ -763,11 +772,11 @@ void shaderInit()
   // http://rastergrid.com/blog/2010/01/uniform-buffers-vs-texture-buffers/
   GLfloat bufPalette[3*128];
   for (int i=0; i<128; ++i) {
-    const float z = sq(i/127.0);
+    const float z = float(sq(i/127.0f));
     // rgb, // a
-    bufPalette[3*i+0] = z * 0.9;
-    bufPalette[3*i+1] = z * 1.0;
-    bufPalette[3*i+2] = z * 0.4;
+    bufPalette[3*i+0] = z * 0.9f;
+    bufPalette[3*i+1] = z * 1.0f;
+    bufPalette[3*i+2] = z * 0.4f;
 //  bufPalette[4*i+3] = 1.0;
   }
 
@@ -1644,9 +1653,6 @@ void drawAll()
   aim();
 }
 
-#ifdef _MSC_VER
-inline float drand48() { return float(rand()) / float(RAND_MAX); } 
-#endif
 
 void makeTextureNoise()
 {
@@ -1754,7 +1760,11 @@ void* samplewriter(void*)
 
 const char* dirMarshal = ".timeliner_marshal";
 
+#ifdef _MSC_VER
+int mainCore(int argc, char** const argv)
+#else
 int main(int argc, char** argv)
+#endif
 {
   appname = argv[0];
   testConverters();
