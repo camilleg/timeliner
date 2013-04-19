@@ -36,6 +36,8 @@
 #include <sndfile.h>
 #include <vector>
 
+#define GLEW_BUILD
+#include <GL/glew.h> // before gl.h
 #include <GL/glut.h>
 
 #if !defined(GLUT_WHEEL_UP)
@@ -706,6 +708,78 @@ private:
 int Feature::mb = mbUnknown;
 std::vector<Feature*> features;
 
+GLuint myPrg = 0;
+void shaderUse(bool f)
+{
+  glUseProgram(f ? myPrg : 0);
+}
+void shaderInit()
+{
+  glewInit();
+  assert(glewIsSupported("GL_VERSION_2_0"));
+  myPrg = glCreateProgram();
+  assert(myPrg > 0);
+  const GLuint myVS = glCreateShader(GL_VERTEX_SHADER);
+  const GLuint myFS = glCreateShader(GL_FRAGMENT_SHADER);
+  // For GLSL 1.30+, should pedantically define my own AttrMultiTexCoord0 instead of deprecated gl_MultiTexCoord0.
+  const GLchar* prgV = "varying float u; void main() { gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex; u = gl_MultiTexCoord0.s; }";
+  const GLchar* prgF = "varying float u; uniform sampler1D heatmap; uniform float palette[3*128]; \n void main() {\n\
+    float i = texture1D(heatmap, u).r; // 0 to 1\n\
+    int j = int(i*127.0) * 3; // 0 to 127*3, by 3's\n\
+    // gl_FragColor = vec4(i,1.0-i,1.0-i,1.0);\n\
+    gl_FragColor = vec4(palette[j],palette[j+1],palette[j+2],1.0);\n\
+}";
+  glShaderSource(myVS, 1, &prgV, NULL);
+  glShaderSource(myFS, 1, &prgF, NULL);
+
+  int r = 0;
+  //int cch=0, cch2=0; char sz[10000] = "";
+
+  glCompileShader(myVS); glGetShaderiv(myVS, GL_COMPILE_STATUS, &r); assert(r != GL_FALSE);
+  //glGetShaderiv(myFS, GL_INFO_LOG_LENGTH, &cch);
+  //glGetShaderInfoLog(myFS, cch, &cch2, sz);
+  //if (cch2>0) printf("vert compile: %s\n", sz);
+
+  glCompileShader(myFS); glGetShaderiv(myFS, GL_COMPILE_STATUS, &r); assert(r != GL_FALSE);
+  //cch = cch2 = 0;
+  //glGetShaderiv(myFS, GL_INFO_LOG_LENGTH, &cch);
+  //glGetShaderInfoLog(myFS, cch, &cch2, sz);
+  //if (cch2>0) printf("frag compile: %s\n", sz);
+
+  glAttachShader(myPrg, myVS);
+  glAttachShader(myPrg, myFS);
+
+  glLinkProgram(myPrg); glGetProgramiv(myPrg, GL_LINK_STATUS,   &r); assert(r != GL_FALSE);
+  //cch = cch2 = 0;
+  //glGetProgramiv(myPrg, GL_INFO_LOG_LENGTH, &cch);
+  //glGetProgramInfoLog(myPrg, cch, &cch2, sz);
+  //if (cch2>0) printf("shader link: %d, %s\n", r, sz);
+
+  // 128 works, but 256 fails to glLinkProgram (and segfaults in glGetProgramInfoLog).
+  // 3000-ish bytes may be the maximum for a uniform array.
+  //
+  // Alternatives: UBO; texelFetch() a buffer texture (TBO), SSBO.
+  // http://stackoverflow.com/questions/7954927/glsl-passing-a-list-of-values-to-fragment-shader
+  // http://rastergrid.com/blog/2010/01/uniform-buffers-vs-texture-buffers/
+  GLfloat bufPalette[3*128];
+  for (int i=0; i<128; ++i) {
+    const float z = sq(i/127.0);
+    // rgb, // a
+    bufPalette[3*i+0] = z * 0.9;
+    bufPalette[3*i+1] = z * 1.0;
+    bufPalette[3*i+2] = z * 0.4;
+//  bufPalette[4*i+3] = 1.0;
+  }
+
+  shaderUse(true); // before calling any glUniform()s, so they know which program to refer to.
+  assert(      glGetUniformLocation(myPrg, "palette") >= 0);
+  glUniform1fv(glGetUniformLocation(myPrg, "palette"), 3*128, bufPalette);
+
+  glActiveTexture(GL_TEXTURE0); // use texture unit 0
+  assert(     glGetUniformLocation(myPrg, "heatmap") >= 0);
+  glUniform1i(glGetUniformLocation(myPrg, "heatmap"), 0); // Bind sampler to texture unit 0.  http://www.opengl.org/wiki/Texture#Texture_image_units
+}
+
 // Top of timeline, measured from bottom of window (y==0) to top of window (y==1).
 // todo: in resize(), keep this a constant # of pixels, e.g.  yTimeline = 20 / pixelSize[1];
 const double yTimeline = 0.03;
@@ -742,6 +816,7 @@ void drawFeatures()
       rgy[j] = rgy[j-1] + rgdy[j-1] / rescale;
     // rgy [0 .. i] are boundaries between features.
   }
+  shaderUse(true);
 
   for (f=features.begin(),i=0; f!=features.end(); ++f,++i) {
     const double* p = rgy + i;
@@ -837,6 +912,7 @@ void drawWaveformScaled(const float* minmaxes, const double yScale) {
 
 void drawWaveform()
 {
+  shaderUse(false);
   // 0 < x < 1
   // y above timeline, and rescale audio values from +-32768.
 
@@ -893,6 +969,7 @@ void drawWaveform()
 double sMouseRuler = 0.0;
 void drawMouseRuler()
 {
+  shaderUse(false);
   const double xL = glFromSecond(sMouseRuler);
   const double xR = xL + 0.06;
   if (xR < 0.0 || xL > 1.0)
@@ -923,6 +1000,7 @@ public:
     _color[3]                  = 1.0;
   };
   void draw() {
+    shaderUse(false);
     if (_color[3] <= 0.0)
       return;			// faded away
     _color[3] -= float(_fadeStep);	// fade
@@ -1199,6 +1277,7 @@ void drawTimeline()
   }
 
   // Draw.
+  shaderUse(false);
   glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, texNoise);
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
@@ -1421,6 +1500,7 @@ void drawTicks()
 
   const double dxMin = 3.0/65.0;
   tickreset();
+  shaderUse(false);
   for (int i=0; i<cUnit; ++i) {
     const char* label = szTick[i];
     const double scale = secTick[i];
@@ -1483,6 +1563,7 @@ void drawThumb()
   assert(0.0 <= x0);
   assert(x0 <= x1);
   assert(x1 <= 1.0);
+  shaderUse(false);
 
   // fade out top edge, so thumb doesn't look manipulable.
   glBegin(GL_QUADS);
@@ -1787,6 +1868,7 @@ int main(int argc, char** argv)
   else {
     info("cached HTK features");
   }
+  shaderInit();
 
   glGenTextures(1, &texNoise);
   prepTexture(texNoise);
