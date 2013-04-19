@@ -12,6 +12,7 @@
 *.suo
 *.tlog
 *.vcxproj.user
+*.unsuccessfulbuild
 timeliner.log
 timeliner_run
 timeliner_pre
