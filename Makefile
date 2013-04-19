@@ -1,8 +1,9 @@
-CFLAGS = -O3 -Wall -ffast-math -fexpensive-optimizations -fomit-frame-pointer -maccumulate-outgoing-args -fno-exceptions
+CFLAGS = -O3 -Wall -ffast-math -fexpensive-optimizations -fomit-frame-pointer -maccumulate-outgoing-args -fno-exceptions -pedantic
 # When compiling on a 32-bit OS, add -D_FILE_OFFSET_BITS=64
 # CFLAGS += -DNDEBUG 
+# CFLAGS += -g -O0
 
-HDRS = timeliner_diagnostics.h timeliner_cache.h timeliner_diagnostics.h timeliner_util.h
+HDRS = timeliner_diagnostics.h timeliner_cache.h timeliner_util.h
 
 OBJS     = timeliner_util.o timeliner_diagnostics.o timeliner_cache.o
 OBJS_PRE = $(OBJS) timeliner_pre.o
