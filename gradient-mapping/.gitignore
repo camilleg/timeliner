@@ -1,0 +1,17 @@
+*.[oa]
+*~
+*.CppClean.log
+*.exe
+*.lastbuildstate
+*.obj
+*.opensdf
+*.idb
+*.ilk
+*.pdb
+*.sdf
+*.suo
+*.tlog
+*.vcxproj.user
+timeliner.log
+timeliner_run
+timeliner_pre
