@@ -87,7 +87,7 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
     for (c=0; iSrc != iSrcMax && pz != pzMax; ++c) {
 #ifndef NDEBUG
       if (!std::isnormal(*iSrc) && *iSrc != 0.0) {
-	printf("warning: invalid floating-point value %f.\n", *iSrc);
+	printf("Warning: invalid floating-point value %f.\n", *iSrc);
       }
 #endif
       *pz++ = Float(*iSrc++);
@@ -134,7 +134,7 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
       if (cLeaves > 300000) {
 	const int percent = int((100.0 * ++iLeaf) / cLeaves);
 	if (percent != percentPrev || percent >= 100.0) {
-	  fprintf(stderr, "caching wav data: %2d%%...\r", percent);
+	  fprintf(stderr, "Caching wav data: %2d%%...\r", percent);
 	  fflush(stderr);
 	  percentPrev = percent;
 	}
@@ -308,7 +308,7 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
     }
   }
 #ifndef NDEBUG
-  printf("cache of Floats uses %.0f MB mobo RAM\n", cb / float(1e6));
+  printf("Cache of floats uses %.0f MB mobo RAM.\n", cb / float(1e6));
 #endif
 }
 
@@ -416,7 +416,7 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
       if (cLeaves > 300000) {
 	const int percent = int((100.0 * ++iLeaf) / cLeaves);
 	if (percent != percentPrev || percent >= 100.0) {
-	  fprintf(stderr, "caching wav data: %2d%%...\r", percent);
+	  fprintf(stderr, "Caching wav data: %2d%%...\r", percent);
 	  fflush(stderr);
 	  percentPrev = percent;
 	}
@@ -586,7 +586,7 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
     }
   }
 #ifndef NDEBUG
-  printf("cache of shorts uses %.0f MB mobo RAM\n", cb / float(1e6));
+  printf("Cache of shorts uses %.0f MB mobo RAM.\n", cb / float(1e6));
 #endif
 }
 
