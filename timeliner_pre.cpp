@@ -336,7 +336,7 @@ public:
 	  // http://blogs.msdn.com/b/vcblog/archive/2013/07/19/c99-library-support-in-visual-studio-2013.aspx
     for (size_t i=0; i<m_cz; ++i) {
       if (!std::isnormal(m_data[i]) && m_data[i] != 0.0) {
-	printf("Feature's float %d of %d is bogus: class %d, value %f\n", i, m_cz, std::fpclassify(m_data[i]), m_data[i]);
+	printf("Feature's float %lu of %lu is bogus: class %d, value %f\n", i, m_cz, std::fpclassify(m_data[i]), m_data[i]);
 	quit("");
       }
     }
@@ -580,7 +580,7 @@ int main(int argc, char** argv)
 
     const double samplesPerSecond = samplesPerRecord / secondsPerRecord;
     const long shortsPerRecord = samplesPerRecord * channels;
-    const long bytesPerRecord = shortsPerRecord * 2; // "rsz" in Kyle's parser
+    // const long bytesPerRecord = shortsPerRecord * 2; // "rsz" in Kyle's parser
     // std::cerr << "sr is " << samplesPerSecond << ".\n" << bytesPerRecord << " bytesPerRecord.\n";
     pch += channels * (8+32); // Skip "nsp".  Now pch points at the signed 16-bit data.
 
