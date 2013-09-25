@@ -48,6 +48,8 @@ void putsGlut(const char* pch = sprintfbuf, bool fMask = true)
 {
   while (*pch) glutBitmapCharacter(font, *pch++);
 }
+// Alternative: http://stackoverflow.com/questions/5262951/what-is-state-of-the-art-for-text-rendering-in-opengl-as-of-version-4-1 ,
+// which cites: http://bytewrangler.blogspot.co.uk/2011/10/signed-distance-fields.html GLSL'd: replace clip() with if (text.a<0.5) {discard;}
 
 void prepTextureMipmap(const GLuint t)
 {
@@ -343,6 +345,7 @@ void drawFeatures()
       rgy[j] = rgy[j-1] + rgdy[j-1] / rescale;
     // rgy[0 .. i] are boundaries between features.
   }
+  // TODO: compute rgy only once, and then save it.
 
   // glActiveTexture(GL_TEXTURE0); // use texture unit 0		// Has no effect.
   for (f=features.begin(),i=0; f!=features.end(); ++f,++i) {
@@ -370,16 +373,16 @@ void drawFeatures()
 	  glEnd();
 	}
       }
+  }
 
-    glColor4f(1,0,0, 1);
-    // Has no effect.  Alternatives:
-    // http://stackoverflow.com/questions/18988047/set-raster-color-for-glutbitmapcharacter-when-using-shaders
-    // http://stackoverflow.com/questions/5262951/what-is-state-of-the-art-for-text-rendering-in-opengl-as-of-version-4-1
-    //   cites: http://bytewrangler.blogspot.co.uk/2011/10/signed-distance-fields.html GLSL'd: replace clip() with if (text.a < 0.5) {discard;}
-
+  glUseProgram(0);
+  glColor4f(0,0,1, 1);
+  for (f=features.begin(),i=0; f!=features.end(); ++f,++i) {
+    const double* p = rgy + i;
     glRasterPos2d(0.01, p[0] + 0.005);
     putsGlut("Label");
   }
+  glUseProgram(myPrg);
 }
 
 void aimCrop()
@@ -626,6 +629,13 @@ void drawAll()
     const glm::mat4 MVPmatrix = matProj * matView * matScale;
     glUniformMatrix4fv(glGetUniformLocation(myPrg, "mvp"), 1, GL_FALSE, glm::value_ptr(MVPmatrix));
 
+#ifdef putsGlut_still_misplaced_for_nondefault_yShow
+    glUseProgram(0);
+    gluOrtho2D(0,1, 0,1);
+    glTranslated(0.0, -dy, 0.0);
+    glScaled(1.0, yZoom, 1.0);
+    glUseProgram(myPrg);
+#endif
     drawFeatures();
   glPopMatrix();
   glutSwapBuffers();
