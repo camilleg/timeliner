@@ -331,12 +331,16 @@ public:
   void validate() const
   {
 #ifndef NDEBUG
-    for (int i=0; i<m_cz; ++i) {
+#ifndef _MSC_VER
+	  // VS2013 only got std::isnormal and std::fpclassify in July 2013:
+	  // http://blogs.msdn.com/b/vcblog/archive/2013/07/19/c99-library-support-in-visual-studio-2013.aspx
+    for (size_t i=0; i<m_cz; ++i) {
       if (!std::isnormal(m_data[i]) && m_data[i] != 0.0) {
 	printf("Feature's float %d of %d is bogus: class %d, value %f\n", i, m_cz, std::fpclassify(m_data[i]), m_data[i]);
 	quit("");
       }
     }
+#endif
 #endif
   }
 

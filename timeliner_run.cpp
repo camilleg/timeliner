@@ -606,12 +606,17 @@ public:
 #ifdef NDEBUG
     _unused(slices);
 #else
-    for (int i=0; i<_cz; ++i) {
-      if (!std::isnormal(_pz[i]) && _pz[i] != 0.0) {
+
+#ifndef _MSC_VER
+	// VS2013 only got std::isnormal and std::fpclassify in July 2013:
+	// http://blogs.msdn.com/b/vcblog/archive/2013/07/19/c99-library-support-in-visual-studio-2013.aspx
+	for (int i=0; i<_cz; ++i) {
+    if (!std::isnormal(_pz[i]) && _pz[i] != 0.0) {
 	printf("binaryload: feature's float %d of %ld is bogus: class %d, value %f\n", i, _cz, std::fpclassify(_pz[i]), _pz[i]);
 	quit("");
       }
     }
+#endif
 #endif
   };
 

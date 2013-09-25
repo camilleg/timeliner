@@ -86,9 +86,13 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
     unsigned c;
     for (c=0; iSrc != iSrcMax && pz != pzMax; ++c) {
 #ifndef NDEBUG
-      if (!std::isnormal(*iSrc) && *iSrc != 0.0) {
+#ifndef _MSC_VER
+	    // VS2013 only got std::isnormal in July 2013:
+	    // http://blogs.msdn.com/b/vcblog/archive/2013/07/19/c99-library-support-in-visual-studio-2013.aspx
+		if (!std::isnormal(*iSrc) && *iSrc != 0.0) {
 	printf("Warning: invalid floating-point value %f.\n", *iSrc);
       }
+#endif
 #endif
       *pz++ = Float(*iSrc++);
     }
@@ -264,9 +268,14 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
 	{
 	  for (unsigned _=0; _<width; ++_) {
 	    const int __ = _*3;
-	    assert(!isnan(L[j+__+3]));
+
+#ifndef _MSC_VER
+	    // VS2013 only got std::isnan in July 2013:
+	    // http://blogs.msdn.com/b/vcblog/archive/2013/07/19/c99-library-support-in-visual-studio-2013.aspx
+		assert(!isnan(L[j+__+3]));
 	    assert(!isnan(L[j+__+4]));
 	    assert(!isnan(L[j+__+5]));
+#endif
 	    assert(L[j+__+3] <= L[j+__+4] + epsilon); // min <= mean
 	    assert(L[k+__+3] <= L[k+__+4] + epsilon); // min <= mean
 	    assert(L[j+__+4] <= L[j+__+5] + epsilon); // mean <= max
