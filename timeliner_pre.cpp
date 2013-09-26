@@ -51,12 +51,8 @@ std::string configfile = "timeliner_config.txt";
 #include "timeliner_cache.h"
 #include "timeliner_util.h"
 
-// nonstandard.
-std::string itoa(const int x) {
-  static char s[100];
-  sprintf(s, "%d", x);
-  return s;
-}
+// C++-11 deprecates this with std::to_string().
+template <typename T> std::string to_str(const T& t) { std::ostringstream os; os << t; return os.str(); }
 
 void fileFromString(const std::string& outfilename, const std::string& indata) {
   std::ofstream t(outfilename.c_str());
@@ -174,8 +170,8 @@ std::string htkFromWav(const int channel, const int iKind, const std::string& in
     USEHAMMING = T\n\
     ZMEANSOURCE = T\n\
     WINDOWSIZE = " + sampPeriodTimes8 + "\n\
-    NUMCHANS = " + itoa(numchans) + "\n\
-    HIFREQ = " + itoa(SR/2) + "\n\
+    NUMCHANS = " + to_str(numchans) + "\n\
+    HIFREQ = " + to_str(SR/2) + "\n\
     LOFREQ = 0\n\
     SOURCEFORMAT = WAV\n\
     USEPOWER = T\n\
@@ -184,7 +180,7 @@ std::string htkFromWav(const int channel, const int iKind, const std::string& in
     ";
   const std::string Config[3] = {
     "TARGETKIND = FBANK_Z\n",
-    "TARGETKIND = MFCC_Z\nNUMCEPS = " + itoa(numchans) + "\n",
+    "TARGETKIND = MFCC_Z\nNUMCEPS = " + to_str(numchans) + "\n",
     "TARGETKIND = FBANK_D_A_Z\n"
   };
   fileFromString(Hcfg, ConfigCommon + Config[iKind]);
@@ -273,7 +269,7 @@ void readHTK(const std::string& caption, const std::string& filename,
   const long secs = long(nsamps*period_hnsu / 1e7);
   const unsigned di = bytesPerSamp/4;
   info("sample kind " + parmkind_name[parmkind_base] + parmkind_qualifiers);
-  info(itoa(nsamps) + " samples == " + itoa(secs) + " sec, " + itoa(period_hnsu) + " hnsu, " + itoa(di) + " floats/sample.");
+  info(to_str(nsamps) + " samples == " + to_str(secs) + " sec, " + to_str(period_hnsu) + " hnsu, " + to_str(di) + " floats/sample.");
   if (cz * sizeof(float) != nsamps*bytesPerSamp) {
     quit("header mismatched body in htk file " + filename);
   }
