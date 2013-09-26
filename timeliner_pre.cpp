@@ -346,9 +346,12 @@ public:
   {
     if (!m_data || m_cz==0)
       quit("no data for feature '" + m_name);
-    cb = m_name.size() + 1;
+
+	cb = m_name.size() + 1;
     pb = new char[cb];
-    (void)strncpy(pb, m_name.c_str(), cb);
+    (void)std::copy(m_name.begin(), m_name.end(), pb);
+	pb[cb] = '\0';
+
     cz = 4 + m_cz;
     pz = new float[cz];
     pz[0] = float(m_iColormap);
