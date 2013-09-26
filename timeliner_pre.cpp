@@ -84,7 +84,7 @@ double* hamming(int w) {
 }
 
 // Modifies rgz in-place (with htonl()).
-std::string writeHTK(const std::string& outfile, float* rgz, const long cz, const unsigned floatsPerSlice, const float sampPeriodHNSU) {
+std::string writeHTK(const std::string& outfile, float* rgz, const long cz, const unsigned floatsPerSlice, const unsigned long sampPeriodHNSU) {
   if (cz <= 0)
     quit("refused to write HTK file with no data");
   for (int i=0; i<cz; ++i) {
@@ -102,7 +102,7 @@ std::string writeHTK(const std::string& outfile, float* rgz, const long cz, cons
   return outfile;
 }
 
-std::string writeHTKWavelet(const int channel, const std::string& fileOut, const float sampPeriodHNSU) {
+std::string writeHTKWavelet(const int channel, const std::string& fileOut, const unsigned long sampPeriodHNSU) {
 #ifdef _MSC_VER
 	warn("wavelets nyi in Windows, because the port of GNU GSL is ancient and unmaintained.");
 	return fileOut;
@@ -110,7 +110,7 @@ std::string writeHTKWavelet(const int channel, const std::string& fileOut, const
   const unsigned cSampWindow = 32;
   gsl_wavelet* w = gsl_wavelet_alloc(gsl_wavelet_daubechies_centered, 4);
   gsl_wavelet_workspace* workspace = gsl_wavelet_workspace_alloc(cSampWindow);
-  const float sSamp = sampPeriodHNSU / 1e7;
+  const float sSamp = float(sampPeriodHNSU) / 1e7;
   const size_t stride = sSamp * SR;
   if (cSampWindow < stride)
     warn("wavelet window is shorter than stride, so samples between windows will be ignored");
@@ -151,7 +151,7 @@ long wavcsamp_fake = -1;
 int channels_fake = -1;
 unsigned channels = 1;  // mono, stereo, etc
 int numchans = 62; // frequency bands per filterbank, mfcc, or wavelet
-const float sampPeriodF = 100000.0;
+const unsigned long sampPeriodF = 100000;
 const std::string sampPeriod = "100000.0"; // hnsu, hundreds of nanoseconds, i.e. 1e-7 seconds, or decimicroseconds.
 const std::string sampPeriodTimes8 = "800000.0";
 
