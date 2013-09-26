@@ -36,12 +36,8 @@
 #include <sndfile.h>
 #include <vector>
 
-// Linux: apt-get install libglew-dev
+// Linux:   apt-get install libglew-dev
 // Windows: http://glew.sourceforge.net/install.html
-#ifdef _MSC_VER
-#define GLEW_STATIC
-#endif
-#define GLEW_BUILD
 #include <GL/glew.h> // before gl.h
 #include <GL/glut.h>
 

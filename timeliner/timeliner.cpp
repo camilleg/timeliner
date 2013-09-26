@@ -1,8 +1,5 @@
-// timeliner.cpp : Defines the entry point for the console application.
-//
-
+// Entry point for the console application.
 #include "stdafx.h"
-
 extern int mainCore(int argc, char** const argv);
 
 int _tmain(int argc, _TCHAR* argv[])

@@ -1,4 +1,5 @@
 #ifdef _MSC_VER
+#include "timeliner/stdafx.h"
 #define _CRT_SECURE_NO_WARNINGS		// for strcpy, getenv, _snprintf, fopen, fscanf
 #endif
 
@@ -407,7 +408,7 @@ inline std::string& trimTrailingComment(std::string &s) {
 bool removeable(const std::string& s) { return s.empty() || s[0] == '#'; }
 bool keyvalue(const std::string& s) { return s.find('=') != s.npos; } // lazy shortcut
 
-int main(int argc, char** argv)
+int mainCore(int argc, char** argv)
 {
   appname = argv[0];
   switch (argc) {
@@ -685,4 +686,10 @@ int main(int argc, char** argv)
 
   for (unsigned i=0; i<channels; ++i) delete [] rawS16[i];
   return 0;
+}
+
+int _tmain(int argc, _TCHAR* argv[])
+{
+    // For this to run, disable unicode: config properties, general, project defaults, character set, "not set".
+	return mainCore(0, NULL);
 }
