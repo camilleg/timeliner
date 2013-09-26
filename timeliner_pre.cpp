@@ -688,8 +688,16 @@ int mainCore(int argc, char** argv)
   return 0;
 }
 
+#ifdef _MSC_VER
 int _tmain(int argc, _TCHAR* argv[])
 {
-    // For this to run, disable unicode: config properties, general, project defaults, character set, "not set".
-	return mainCore(0, NULL);
+  // For this to run, disable unicode: config properties, general, project defaults, character set, "not set".
+  return mainCore(0, NULL);
 }
+#else
+int main(int argc, char** argv)
+{
+  return mainCore(argc, argv);
+}
+#endif
+
