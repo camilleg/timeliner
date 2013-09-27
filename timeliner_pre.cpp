@@ -533,7 +533,7 @@ int mainCore(int argc, char** argv)
     }
 #else
 #ifdef _MSC_VER
-    (void)CopyFile(wavSrc, dirMarshal + "/mixed.wav", false);
+    (void)CopyFile(wavSrc.c_str(), (dirMarshal + "/mixed.wav").c_str(), false);
     // if returns zero, call GetLastError().
 #else
     CopyFile(wavSrc.c_str(), (dirMarshal + "/mixed.wav").c_str());
