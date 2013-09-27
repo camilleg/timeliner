@@ -371,6 +371,28 @@ void marshal(const char* filename, Feature feat) {
   // Worth making a class of rgb, cb, rgz, cz?  Then destructor could delete[] rgb and rgz.
 }
 
+#ifndef _MSC_VER
+bool CopyFile(const char* filenameSrc, const char* filenameDst)
+{
+  const size_t cb = 4194304; // 4 MB
+  char buf[cb];
+  const int src = open(filenameSrc, O_RDONLY, 0);
+  if (src < 0)
+    return false;
+  const int dst = open(filenameDst, O_WRONLY | O_CREAT, 0644);
+  if (dst < 0) {
+    close(src);
+    return false;
+  }
+  size_t size;
+  while ((size = read(src, buf, cb)) > 0)
+    write(dst, buf, size);
+  close(src);
+  close(dst);
+  return true;
+}
+#endif
+
 std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
   std::stringstream ss(s);
   std::string item;
@@ -501,14 +523,23 @@ int mainCore(int argc, char** argv)
       quit(wavSrc + " doesn't have format .wav PCM 16-bit.  Sorry.");
     // todo: /usr/include/sndfile.h actually supports dozens of other file formats.  So allow those.
     // todo: convert to 16-bit 16khz, before storing in wavS16.  Without calling system("sox ..."), so it works in win32.
-#ifdef _MSC_VER
-    #error "todo: port system('cp ...') to windows"
-#define strtof(a,b) strtol(a,b,10)
-#pragma message("warning: Visual Studio doesn't support C99's strtof().")
+
+
+#ifdef too_slow_for_huge_files
+    {
+      std::ifstream src(wavSrc.c_str(), std::ios::binary);
+      std::ofstream dst((dirMarshal + "/mixed.wav").c_str(), std::ios::binary);
+      dst << src.rdbuf();
+    }
 #else
-    if (-1 == system(("cp " + wavSrc + " " + dirMarshal + "/mixed.wav").c_str()))
-      quit("system(cp) failed");
+#ifdef _MSC_VER
+    (void)CopyFile(wavSrc, dirMarshal + "/mixed.wav", false);
+    // if returns zero, call GetLastError().
+#else
+    CopyFile(wavSrc.c_str(), (dirMarshal + "/mixed.wav").c_str());
 #endif
+#endif
+
     info("reading " + wavSrc);
     wavcsamp = long(sfinfo.frames);
     channels = sfinfo.channels;
@@ -551,6 +582,11 @@ int mainCore(int argc, char** argv)
       quit("truncated global header in EDF file " + wavSrc);
     //info("parsing EDF header");
     //info(std::string(pch, 256));
+
+#ifdef _MSC_VER
+#define strtof(a,b) strtol(a,b,10)
+#pragma message("warning: Visual Studio doesn't support C99's strtof().")
+#endif
 
     // Lazily ignore strtol's errno: http://stackoverflow.com/questions/194465/how-to-parse-a-string-to-an-int-in-c
     char* end;
