@@ -10,9 +10,10 @@
 *.pdb
 *.sdf
 *.suo
+*.swp
 *.tlog
 *.vcxproj.user
 *.unsuccessfulbuild
 timeliner.log
 timeliner_run
-timeliner_pre
+*/*/timeliner_pre.log
