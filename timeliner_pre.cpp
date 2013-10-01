@@ -347,7 +347,7 @@ public:
     if (!m_data || m_cz==0)
       quit("no data for feature '" + m_name);
 
-	cb = m_name.size() + 1;
+	cb = m_name.size();
     pb = new char[cb];
     (void)std::copy(m_name.begin(), m_name.end(), pb);
 	pb[cb] = '\0';
@@ -385,8 +385,13 @@ bool CopyFile(const char* filenameSrc, const char* filenameDst)
     return false;
   }
   size_t size;
-  while ((size = read(src, buf, cb)) > 0)
-    write(dst, buf, size);
+  while ((size = read(src, buf, cb)) > 0) {
+    if (write(dst, buf, size) < 0)
+      break;
+  }
+  // Could do while (read()>0 && write>=0), but then
+  // && must be a "sequence point" so the write happens after the read.
+  // Brittle and subtle, e.g. in C90 Standard section 6.3.
   close(src);
   close(dst);
   return true;
@@ -501,6 +506,7 @@ int mainCore(int argc, char** argv)
     quit("failed to chdir to dir above marshal dir");
 
   const std::string suffix = wavSrc.substr(wavSrc.size()-3);
+  if (channels_fake < 0) channels_fake = channels;
   if (suffix == "wav") {
     // www.mega-nerd.com/libsndfile/api.html
     SF_INFO sfinfo;

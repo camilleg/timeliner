@@ -590,14 +590,19 @@ public:
 
   void binaryload(const char* pch, long cch) {
     assert(4 == sizeof(float));
-    strcpy(_name, pch);				pch += strlen(_name) + 1;
+    strcpy(_name, pch);				pch += strlen(_name);
     _iColormap = int(*(float*)pch);		pch += sizeof(float);
     _period = *(float*)pch;			pch += sizeof(float);
     const int slices = int(*(float*)pch);	pch += sizeof(float);
     _vectorsize = int(*(float*)pch);		pch += sizeof(float);
     _pz = (const float*)pch; // _cz floats.  Not doubles.
-    _cz = (cch - long(strlen(_name) + 1 + 4*sizeof(float))) / 4;
-    //printf("name %s, colormap %d, period %f, slices %d, width %d, cz %d.\n", _name, _iColormap, _period, slices, _vectorsize, _cz);
+    _cz = (cch - long(strlen(_name) + 4*sizeof(float))) / 4;
+#ifndef NDEBUG
+    printf("debugging feature: name %s, colormap %d, period %f, slices %d, width %d, cz %lu.\n", _name, _iColormap, _period, slices, _vectorsize, _cz);
+#endif
+    if (_iColormap<0 || _period<=0.0 || slices<=0 || _vectorsize<=0) {
+      quit("binaryload: feature '" + std::string(_name) + "' has corrupt data");
+    }
     assert(slices*_vectorsize == _cz);
 #ifdef NDEBUG
     _unused(slices);
