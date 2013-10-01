@@ -75,18 +75,18 @@ public:
 
   Feature() {
     _vectorsize = 5; // pixel height
-    _period = 1.0/SR;	// waveform's sample rate
+    _period = 1.0f/SR;	// waveform's sample rate
     const int slices = wavcsamp;
     _cz = slices*_vectorsize;
     float* pz = new float[_cz];
     for (int t=0; t < slices; ++t)
       for (int s=0; s < _vectorsize; ++s) {
 	// test pattern
-	const float x = t / (slices-1.0);
-	const float y = s / (_vectorsize-1.0);
-	const float xPulse = (t % 1000) * 0.001;
-//	pz[t*_vectorsize+s] = 0.5*x + 0.5*y;
-	pz[t*_vectorsize+s] = 0.5*x + 0.1*xPulse + 0.38*y; // + 0.11*drand48();
+	const float x = t / (slices-1.0f);
+	const float y = s / (_vectorsize-1.0f);
+	const float xPulse = (t % 1000) * 0.001f;
+//	pz[t*_vectorsize+s] = 0.5f*x + 0.5f*y;
+	pz[t*_vectorsize+s] = 0.5f*x + 0.1f*xPulse + 0.38f*y; // + 0.11f*drand48();
       }
     _pz = pz;
     makeMipmaps();
@@ -279,25 +279,25 @@ void shaderInit()
   // test pattern
 #if 0
   for (int i=0; i<127; ++i) {
-    const float z = i/126.0;
+    const float z = i/126.0f;
     // rgb
     bufPalette[3*i+0] = z;
-    bufPalette[3*i+1] = 1.0-z;
-    bufPalette[3*i+2] = 0.7 * drand48();
+    bufPalette[3*i+1] = 1.0f-z;
+    bufPalette[3*i+2] = 0.7f * drand48();
   }
   for (int i=50; i<53; ++i) {
-    bufPalette[3*i+0] = 0.0;
-    bufPalette[3*i+1] = 0.0;
-    bufPalette[3*i+2] = 0.0;
+    bufPalette[3*i+0] = 0.0f;
+    bufPalette[3*i+1] = 0.0f;
+    bufPalette[3*i+2] = 0.0f;
   }
 #else
   // rainbow
   for (int i=0; i<127; ++i) {
-    const float z = i/126.0;
+    const float z = i/126.0f;
     // hsv
     bufPalette[3*i+0] = z;
-    bufPalette[3*i+1] = 0.93;
-    bufPalette[3*i+2] = 0.89 - 0.3*z;
+    bufPalette[3*i+1] = 0.93f;
+    bufPalette[3*i+2] = 0.89f - 0.3f*z;
     RgbFromHsv(bufPalette + 3*i);
   }
 #endif
@@ -642,7 +642,11 @@ void drawAll()
   aim();
 }
 
+#ifdef _MSC_VER
+int mainCore(int argc, char** const argv)
+#else
 int main(int argc, char** argv)
+#endif
 {
   glutInit(&argc, argv);
 

@@ -17,17 +17,23 @@ Mmap::Mmap(const std::string& szFilename, const bool fOptional) : _pch(NULL) {
     h = CreateFileA( (LPCSTR)szFilename.c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (h == INVALID_HANDLE_VALUE) {
       if (!fOptional)
-	    warn("mmap: problem opening file" + szFilename);
+	warn("mmap: problem reading file " + szFilename);
       return;
     }
     h2 = CreateFileMapping(h, NULL, PAGE_READONLY, 0, 0, NULL);
-    if (h2 == NULL)
-      warn("mmap: problem #2 opening file" + szFilename);
+    if (h2 == NULL) {
+      warn("mmap: problem #2 reading file " + szFilename);
+      return;
+    }
     _pch = (char*)MapViewOfFile(h2, FILE_MAP_READ, 0, 0, 0);
+    if (_pch == NULL) {
+      warn("mmap: problem #3 reading file " + szFilename); // To see why, call GetLastError.
+      return;
+    }
 
     _cch.QuadPart = 0;
     if (GetFileSizeEx(h, &_cch) == 0)
-      warn("mmap: problem measuring file" + szFilename);
+      warn("mmap: problem measuring file " + szFilename);
 }
 Mmap::~Mmap() {
 	if (h != INVALID_HANDLE_VALUE) {
@@ -44,7 +50,7 @@ Mmap::Mmap(const std::string& szFilename, bool fOptional) : _pch(NULL), _cch(0),
     _fd = open(szFilename.c_str(), O_RDONLY);
     if (_fd < 0) {
       if (!fOptional)
-	warn("mmap: problem opening file" + szFilename);
+	warn("mmap: problem reading file " + szFilename);
       return;
     }
     struct stat s;
