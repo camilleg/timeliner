@@ -28,14 +28,14 @@ Install [freeglut](http://freeglut.sourceforge.net), using Visual Studio.
 - Build all 4 configurations: debug and release, static and non-static.
 
 Install [GLM](http://glm.g-truc.net).
-- Copy glm/glm.hpp somewhere.
+- Copy the folder `glm` (that contains `glm.hpp`, etc.) somewhere.
 
 Install [HTK 3.4.1](http://htk.eng.cam.ac.uk).  Corrected instructions:
 - Don't bother adding "C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin" to your PATH.
 - Instead of VCVARS32, run "C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin\vcvars32.bat" (note the double quotes).
 - Ignore every .c file's compiler warnings D9035, D9036, and D9002.  HCopy will still run.
-- Either add to your PATH the bin.win32 folder, wherever you put that,
-or copy bin.win32/HCopy.exe to some folder on your PATH.
+- Either add to your PATH the folder `bin.win32`, wherever you'd put that,
+or copy `bin.win32/HCopy.exe` to some folder on your PATH.
 
 Start Visual Studio.  Open timeliner\timeliner.sln.
 Within that solution, in each project, rightclick Properties;
@@ -48,11 +48,11 @@ Within that solution, in each project, rightclick Properties;
     	* for project `timeliner_pre`, a marshal dir and a config file, e.g. `example\stereo\marshal example\stere\config.txt`.
     	* for project `timeliner`, a marshal dir, e.g. `example\stereo\marshal`.
 
-Build the debug and/or release versions of timeliner_run and timeliner_pre.
+Build the debug and/or release versions of projects `timeliner_pre` and `timeliner`.
 
-Copy freeglut.dll and libsndfile-1.dll to timeliner\Debug and timeliner\Release.
+Copy `freeglut.dll` and `libsndfile-1.dll` to `timeliner\Debug` and `timeliner\Release`.
 
-Run Timeliner (with Ctrl+F5).
+Run (with Ctrl+F5) the projects `timeliner_pre` and `timeliner`.
 
 (Audio is built on RtAudio, which uses Windows' own DirectSound.)
 
