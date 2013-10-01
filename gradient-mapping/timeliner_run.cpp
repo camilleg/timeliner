@@ -63,7 +63,7 @@ void prepTextureMipmap(const GLuint t)
 }
 
 const int SR = 8000;
-const long wavcsamp = SR*3;
+const long wavcsamp = SR*10; // duration of test pattern
 
 #include "timeliner_cache.h"
 class Feature {
@@ -86,7 +86,7 @@ public:
 	const float y = s / (_vectorsize-1.0);
 	const float xPulse = (t % 1000) * 0.001;
 //	pz[t*_vectorsize+s] = 0.5*x + 0.5*y;
-	pz[t*_vectorsize+s] = 0.2*x + 0.4*xPulse + 0.38*y; // + 0.11*drand48();
+	pz[t*_vectorsize+s] = 0.5*x + 0.1*xPulse + 0.38*y; // + 0.11*drand48();
       }
     _pz = pz;
     makeMipmaps();
@@ -667,7 +667,7 @@ int main(int argc, char** argv)
   glDisable(GL_LIGHTING);
 
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  const int cFeature = 2;
+  const int cFeature = 3;
   for (int i=cFeature; i>=1; --i) features.push_back(new Feature());
   shaderInit();
   glutMainLoop();
