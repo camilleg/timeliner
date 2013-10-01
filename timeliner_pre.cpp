@@ -155,13 +155,25 @@ const unsigned long sampPeriodF = 100000;
 const std::string sampPeriod = "100000.0"; // hnsu, hundreds of nanoseconds, i.e. 1e-7 seconds, or decimicroseconds.
 const std::string sampPeriodTimes8 = "800000.0";
 
+#ifdef _MSC_VER
+const std::string Hcfg = "c:\\temp\\timeliner_hcopy.cfg";
+const std::string Outfile = "c:\\temp\\timeliner_htk";
+// TODO: instead of c:\\temp use _dupenv_s(&pch, &cch, "TEMP"), and then free cch.  Ditto for channel.wav.
+#else
 const std::string Hcfg = "/tmp/timeliner_hcopy.cfg";
 const std::string Outfile = "/tmp/timeliner_htk";
-std::string htkFromWav(const int channel, const int iKind, const std::string& infile) {
+#endif
+std::string htkFromWav(const int channel, int iKind, const std::string& infile) {
   if (iKind < 0 || iKind >= 4)
     return infile;
-  if (iKind == 3)
+  if (iKind == 3) {
+#ifdef _MSC_VER
+    warn("wavelets nyi in Windows; using filterbank instead.");
+    iKind = 0;
+#else
     return writeHTKWavelet(channel, Outfile, sampPeriodF);
+#endif
+  }
   if (iKind == 2)
     warn("Quicknet (qnsfws, feacat) support nyi.");
 
@@ -186,7 +198,11 @@ std::string htkFromWav(const int channel, const int iKind, const std::string& in
   fileFromString(Hcfg, ConfigCommon + Config[iKind]);
   (void)remove(Outfile.c_str()); // Mere paranoia.  The file really shouldn't be there.
 
+#ifdef _MSC_VER
+  const std::string channelfile = "c:\\temp\\channel.wav";
+#else
   const std::string channelfile = "/tmp/channel.wav";
+#endif
 
   // Create channelfile from rawS16[channel].
   SF_INFO sfinfo;
@@ -226,9 +242,11 @@ std::string htkFromWav(const int channel, const int iKind, const std::string& in
 void readHTK(const std::string& caption, const std::string& filename,
     double& period, long& vectorsize, float*& data, size_t& cz)
 {
-  const Mmap* foo = new Mmap(filename);
+  const Mmap* foo = new Mmap(filename, false);
   const char* pch = foo->pch();
   const unsigned cch = foo->cch();
+  if (!pch)
+    quit("missing HTK file " + filename);
   if (cch == 0)
     quit("empty HTK file " + filename);
   if (cch < 12)
@@ -348,7 +366,7 @@ public:
       quit("no data for feature '" + m_name);
 
 	cb = m_name.size();
-    pb = new char[cb];
+    pb = new char[cb+1];
     (void)std::copy(m_name.begin(), m_name.end(), pb);
 	pb[cb] = '\0';
 
@@ -461,12 +479,13 @@ int mainCore(int argc, char** argv)
   if (chdir(dirOriginal.c_str()) != 0) {
     quit("failed to chdir to starting directory " + dirOriginal);
   }
+#ifndef _MSC_VER
   //info("looking for " + configfile + " in directory " + get_current_dir_name());
-
+#endif
   // Fast for files under 50KB.  Otherwise, see http://stackoverflow.com/questions/2602013/read-whole-ascii-file-into-c-stdstring .
   std::ifstream t(configfile.c_str());
   if (!t.good())
-    quit("No HTK feature config file " + configfile);
+    quit("No HTK feature config file " + configfile + " in directory " + getcwd(NULL, 0));
   std::stringstream cfg;
   cfg << t.rdbuf();					// read file all at once into one string
   std::vector<std::string> lines = split(cfg.str());	// split string into lines
@@ -730,15 +749,14 @@ int mainCore(int argc, char** argv)
 }
 
 #ifdef _MSC_VER
+// Entry point for the console application.
+// For this to run, disable unicode: config properties, general, project defaults, character set, "not set".
 int _tmain(int argc, _TCHAR* argv[])
-{
-  // For this to run, disable unicode: config properties, general, project defaults, character set, "not set".
-  return mainCore(0, NULL);
-}
 #else
 int main(int argc, char** argv)
+#endif
 {
   return mainCore(argc, argv);
 }
-#endif
+
 
