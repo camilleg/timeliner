@@ -16,30 +16,27 @@ LIBS_RUN = -lasound -lglut -lGLU -lGL -lGLEW -L/usr/X11R6/lib -lXmu -lXi -lXext 
 all: testmono
 
 clean:
-	rm -f timeliner_run timeliner_pre $(OBJS_ALL) timeliner.log 
-# Windows might not yet be able to run ./timeliner_pre to create example/mono/marshal/* .
-clean-for-linux:
-	rm -f timeliner_run timeliner_pre $(OBJS_ALL) timeliner.log example/mono/marshal/*
+	rm -f timeliner_run timeliner_prp $(OBJS_ALL) timeliner.log example/mono/marshal/*
 
 .cpp.o: $(HDRS)
 	g++ $(CFLAGS) -c $<
 
 timeliner_run: $(OBJS_RUN)
 	g++ $(CFLAGS) -o $@ $(OBJS_RUN) $(LIBS_RUN)
-timeliner_pre: $(OBJS_PRE)
+timeliner_prp: $(OBJS_PRE)
 	g++ $(CFLAGS) -o $@ $(OBJS_PRE) $(LIBS_PRE)
 
 testEEG: timeliner_run Makefile example/EEG/marshal/mixed.wav
 	export ALSA_CARD=0 && ./timeliner_run example/EEG/marshal
-example/EEG/marshal/mixed.wav: timeliner_pre /r/timeliner/testcases/eeg/eeg.rec example/EEG/config.txt
-	cd example && ../timeliner_pre EEG/marshal EEG/config.txt
+example/EEG/marshal/mixed.wav: timeliner_prp /r/timeliner/testcases/eeg/eeg.rec example/EEG/config.txt
+	cd example && ../timeliner_prp EEG/marshal EEG/config.txt
 
 teststereo: timeliner_run Makefile example/stereo/marshal/mixed.wav
 	export ALSA_CARD=0 && ./timeliner_run example/stereo/marshal
-example/stereo/marshal/mixed.wav: timeliner_pre example/stereo/choral-stereo.wav example/stereo/config.txt
-	cd example && ../timeliner_pre stereo/marshal stereo/config.txt
+example/stereo/marshal/mixed.wav: timeliner_prp example/stereo/choral-stereo.wav example/stereo/config.txt
+	cd example && ../timeliner_prp stereo/marshal stereo/config.txt
 
 testmono: timeliner_run Makefile example/mono/marshal/mixed.wav
 	export ALSA_CARD=0 && ./timeliner_run example/mono/marshal
-example/mono/marshal/mixed.wav: timeliner_pre example/mono/choral.wav example/mono/config.txt
-	cd example && ../timeliner_pre mono/marshal mono/config.txt
+example/mono/marshal/mixed.wav: timeliner_prp example/mono/choral.wav example/mono/config.txt
+	cd example && ../timeliner_prp mono/marshal mono/config.txt

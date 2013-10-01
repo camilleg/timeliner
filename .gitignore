@@ -16,4 +16,5 @@
 *.unsuccessfulbuild
 timeliner.log
 timeliner_run
+timeliner_prp
 */*/timeliner_pre.log
