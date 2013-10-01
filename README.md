@@ -24,8 +24,8 @@ Use the 32-bit version, not the 64-bit.
 Install "Microsoft Visual Studio Express 2012 for Windows Desktop."
 
 Install [freeglut](http://freeglut.sourceforge.net), using Visual Studio.
+- Build as Win32, not x64 (see the Configuration Manager).
 - Build all 4 configurations: debug and release, static and non-static.
-- Build them as x64 not Win32 (see the Configuration Manager).
 
 Install [GLM](http://glm.g-truc.net).
 - Copy glm/glm.hpp somewhere.
@@ -44,9 +44,14 @@ Within that solution, in each project, rightclick Properties;
     *   In VC++ Directories, add the Include Directory and Library Directory to where you installed libsndfile.  
             (This is smarter than copying `*.lib` and `*.h` into the Timeliner project.)  
             (Beware the different directories `Program Files` and `Program Files (x86)`.)
-    *   In Debugging, for Command Arguments specify a marshal dir, e.g. `example\marshal`.
+    *   In Debugging, for Command Arguments specify:
+    	* for project `timeliner_pre`, a marshal dir and a config file, e.g. `example\stereo\marshal example\stere\config.txt`.
+    	* for project `timeliner`, a marshal dir, e.g. `example\stereo\marshal`.
 
 Build the debug and/or release versions of timeliner_run and timeliner_pre.
+
+Copy freeglut.dll and libsndfile-1.dll to timeliner\Debug and timeliner\Release.
+
 Run Timeliner (with Ctrl+F5).
 
 (Audio is built on RtAudio, which uses Windows' own DirectSound.)
