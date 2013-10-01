@@ -55,15 +55,15 @@ std::string configfile = "timeliner_config.txt";
 template <typename T> std::string to_str(const T& t) { std::ostringstream os; os << t; return os.str(); }
 
 void fileFromString(const std::string& outfilename, const std::string& indata) {
-  std::ofstream t(outfilename.c_str());
+  std::ofstream t(outfilename.c_str(), std::ios_base::binary | std::ios_base::out);
   t.write(indata.c_str(), indata.size());
 }
 void fileFromBuf(const std::string& outfilename, const char* pb, const long cb) {
-  std::ofstream t(outfilename.c_str());
+  std::ofstream t(outfilename.c_str(), std::ios_base::binary | std::ios_base::out);
   t.write(pb, cb);
 }
 void fileFromBufs(const std::string& outfilename, const char* pb, const long cb, const float* pz, const long cz) {
-  std::ofstream t(outfilename.c_str());
+  std::ofstream t(outfilename.c_str(), std::ios_base::binary | std::ios_base::out);
   // Header of bytes.  Body of floats.
   t.write(pb, cb);
   t.write((const char*)pz, cz*sizeof(float));
@@ -553,7 +553,7 @@ int mainCore(int argc, char** argv)
 #ifdef too_slow_for_huge_files
     {
       std::ifstream src(wavSrc.c_str(), std::ios::binary);
-      std::ofstream dst((dirMarshal + "/mixed.wav").c_str(), std::ios::binary);
+      std::ofstream dst((dirMarshal + "/mixed.wav").c_str(), std::ios::binary | std::ios_base::out);
       dst << src.rdbuf();
     }
 #else
