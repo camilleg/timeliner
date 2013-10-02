@@ -92,7 +92,7 @@ class CQuartet {
       }
     } else {
       // Construct a node from an a[].
-      memcpy(a, rhs, (1 + width*3) * sizeof(Float));
+      std::copy(rhs, rhs + (1 + width*3), a);
       for (unsigned j=0; j<width; ++j) {
 	assert(0.0 <= a[3*j+1]); // for htk
 	const Float epsilon = 1e-5;

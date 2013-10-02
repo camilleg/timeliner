@@ -376,7 +376,7 @@ public:
     pz[1] = float(m_period);
     pz[2] = float(m_cz) / m_vectorsize;
     pz[3] = float(m_vectorsize);
-    memcpy(pz+4, m_data, m_cz * sizeof(float));
+    std::copy(m_data, m_data+m_cz, pz+4);
   }
 };
 
@@ -672,8 +672,10 @@ int mainCore(int argc, char** argv)
       if (irecord % 20 == 0) printf("Record %6ld of %6ld expects %ld shorts as %d sequences of %d.\n", irecord, numRecords, shortsPerRecord, channels, samplesPerRecord);
       const short* psRecord = ps + irecord*shortsPerRecord;
       for (int chan = 0; chan < channels_fake; ++chan)
-	memcpy(wavsamples + chan*wavcsamp_fake + irecord*samplesPerRecord,
-	  psRecord + chan*wavcsamp, 2*samplesPerRecord);
+	std::copy(
+	  psRecord + chan*wavcsamp,
+	  psRecord + chan*wavcsamp + samplesPerRecord,
+	  wavsamples + chan*wavcsamp_fake + irecord*samplesPerRecord);
     }
 
     // timeliner_run *playing* 3- or 20- or 94-channel audio is silly.
@@ -707,7 +709,7 @@ int mainCore(int argc, char** argv)
     rawS16 = new short*[channels];
     for (int j=0; j<channels_fake; ++j) {
       rawS16[j] = new short[wavcsamp_fake];
-      memcpy(rawS16[j], ps+j*wavcsamp_fake, wavcsamp_fake*2);
+      std::copy(ps+j*wavcsamp_fake, ps+(j+1)*wavcsamp_fake, rawS16[j]);
     }
 
   } else {

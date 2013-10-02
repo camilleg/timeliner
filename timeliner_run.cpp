@@ -227,13 +227,9 @@ LBackoff:
   }
 
   void _setName(const char* name) {
-    if (name != NULL) {
-      _name = new char[strlen(name)+1];
-      memcpy( (void*)_name, name, strlen(name)+1 );
-    } else {
-      _name = new char[7];
-      memcpy( (void*)_name, "NONAME", 7 );
-    }
+    if (!name)
+      name = "UNNAMED";
+    std::copy(name, name+strlen(name)+1, _name);
   }
 
   bool valid() const { return _mutex != NULL; }
@@ -1691,7 +1687,7 @@ void samplereader(void*) {
     vlockAudio.lock();
 	  const bool f = visSamples > 0;
 	  if (f) {
-		  rtaudioTick(vpsSamples, visSamples*2);
+		  rtaudioTick(vpsSamples, visSamples);
 		  //isKicked -= visSamples;
 		  //if (isKicked < 0) printf("whoa, producer, request more than that.\n");;;;
 		  visSamples = 0;

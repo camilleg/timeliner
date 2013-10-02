@@ -954,7 +954,9 @@ const unsigned char* const CHello::getbatchTextureFromVector(const double t0, co
   for (unsigned j=0; j<width; ++j)
     for (unsigned k=0; k<oversample; ++k) {
       assert(ITexel(j,k,0) + cbSlice <= cbScanline);
-      memcpy(scanline + ITexel(j,k,0), scanline + ITexel(j,0,0), cbSlice);
+      const unsigned char* pchSrc = scanline + ITexel(j,0,0);
+            unsigned char* pchDst = scanline + ITexel(j,k,0);
+      std::copy(pchSrc, pchSrc + cbSlice, pchDst);
     }
   return scanline;
 }
