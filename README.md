@@ -1,8 +1,8 @@
-# timeliner
+### timeliner
 
 A browser for long audio recordings.
 
-# How to build and run Timeliner on Ubuntu 10.04 or 12.04
+### How to build and run Timeliner on Ubuntu 10.04 or 12.04
 
 `sudo apt-get install g++ freeglut3-dev gsl-bin libgsl0-dev libglm-dev libsndfile1-dev \`
 `libxi-dev libxmu-dev libasound2-dev audiofile-tools`
@@ -16,12 +16,12 @@ Optionally install [QuickNet](http://www.icsi.berkeley.edu/Speech/qn.html).
 
 `make`
 
-# How to build Timeliner on Windows
+### How to build Timeliner on Windows
 
 Install [libsndfile](http://www.mega-nerd.com/libsndfile/#Download).
 Use the 32-bit version, not the 64-bit.
 
-Install "Microsoft Visual Studio Express 2012 for Windows Desktop."
+Install Microsoft Visual Studio Express 2012 for Windows Desktop.
 
 Install [freeglut](http://freeglut.sourceforge.net), using Visual Studio.
 - Build as Win32, not x64 (see the Configuration Manager).
@@ -45,14 +45,14 @@ Within that solution, in each project, rightclick Properties;
             (This is smarter than copying `*.lib` and `*.h` into the Timeliner project.)  
             (Beware the different directories `Program Files` and `Program Files (x86)`.)
     *   In Debugging, for Command Arguments specify:
-    	* for project `timeliner_pre`, a marshal dir and a config file, e.g. `example\stereo\marshal example\stere\config.txt`.
+    	* for project `timeliner_pre`, a marshal dir and a config file, e.g. `example\stereo\marshal example\stereo\config.txt`.
     	* for project `timeliner`, a marshal dir, e.g. `example\stereo\marshal`.
 
 Build the debug and/or release versions of projects `timeliner_pre` and `timeliner`.
 
 Copy `freeglut.dll` and `libsndfile-1.dll` to `timeliner\Debug` and `timeliner\Release`.
 
-Run (with Ctrl+F5) the projects `timeliner_pre` and `timeliner`.
+Run the projects `timeliner_pre` and `timeliner` (hit Ctrl+F5).
 
 (Audio is built on RtAudio, which uses Windows' own DirectSound.)
 
