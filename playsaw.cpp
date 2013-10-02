@@ -34,56 +34,47 @@ static unsigned visMax = 0;
 
 // Producer of vps, called by samplereader.
 // Grows visMax (the "high water mark" inside vps[]).
-void rtaudioTick(const short* ps, int cb)
+void rtaudioTick(const short* ps, const int cs)
 {
-	assert(cb % 2 == 0);
-	if (fCritsec) EnterCriticalSection(critsec);
-	assert(vis <= visMax);
-    if (vis < visMax) {
-      // Shove partial buffer back to start of array (slower than circular buffer, oh well).
-      memmove(vps, vps+vis, (visMax-vis)*2);
-      visMax -= vis;
-      // Append fresh samples to not-yet-played samples.
-    }
-    else
-    {
-	  // Buffer was already drained.
-      visMax = 0;
-    }
-	vis = 0;
-	memcpy(vps+visMax, ps, cb);
-  //printf("producing %d\n", cb/2);;;;
-	visMax += cb/2;
-	if (visMax >= sizeof(vps)/sizeof(vps[0]))
-	{
-		printf("\n\toverflow averted, but timeliner will crash!\n\n");
-		visMax = sizeof(vps)/sizeof(vps[0]) - 1;
-	}
-    assert(visMax < sizeof(vps)/sizeof(vps[0]));
-	if (fCritsec) LeaveCriticalSection(critsec);
+  if (fCritsec) EnterCriticalSection(critsec);
+  assert(vis <= visMax);
+  if (vis < visMax) {
+    // Shove partial buffer back to start of array (slower than circular buffer, oh well).
+    memmove(vps, vps+vis, (visMax-vis)*2);
+    visMax -= vis;
+    // Append fresh samples to not-yet-played samples.
+  } else {
+    // Buffer was already drained.
+    visMax = 0;
+  }
+  vis = 0;
+  std::copy(ps, cs, vps+visMax);
+  visMax += cs;
+  if (visMax >= sizeof(vps)/sizeof(vps[0])) {
+    printf("\n\toverflow averted, but timeliner will crash!\n\n");
+    visMax = sizeof(vps)/sizeof(vps[0]) - 1;
+  }
+  assert(visMax < sizeof(vps)/sizeof(vps[0]));
+  if (fCritsec) LeaveCriticalSection(critsec);
   Sleep(14); // emulate blocking write of 16 msec, that rtaudio abandoned some time after v3.0.1 in 2004 (as used by Audacity).
 }
 
 // Called only by saw().
 inline short nextSample()
 {
-	if (vis < visMax)
-		return vps[vis++];
-	// buffer drained
-	vis = 0;
-	visMax = 0;
-	return 0;
+  if (vis < visMax)
+    return vps[vis++];
+  // buffer drained
+  vis = 0;
+  visMax = 0;
+  return 0;
 }
 
 extern void kickProducer(int isRequest);
 
 // Consumer of vps, via nextSample.  Increments vis by actualSize, towards visMax.
 // Data stored in buffer is interleaved between channels
-int rtaudioPlayCallback( void *outputBuffer, void * /*inputBuffer*/,
-		 unsigned int nBufferFrames,
-         double /*streamTime*/,
-		 RtAudioStreamStatus status,
-		 void * /*data*/ )
+int rtaudioPlayCallback( void *outputBuffer, void * /*inputBuffer*/, unsigned int nBufferFrames, double /*streamTime*/, RtAudioStreamStatus status, void * /*data*/ )
 {
   actualSize = nBufferFrames;
   if ( status )
@@ -99,14 +90,14 @@ int rtaudioPlayCallback( void *outputBuffer, void * /*inputBuffer*/,
   //printf("\t\t\t\tconsuming %d\n", nBufferFrames);;;;
   for ( unsigned i=0; i<nBufferFrames; ++i ) {
 #ifndef testsignal
-	  assert(channels == 1);
-	  *buffer++ = nextSample();
+    assert(channels == 1);
+    *buffer++ = nextSample();
 #else
     #define lastValues ((double *) data)
-	for ( unsigned j=0; j<channels; ++j ) {
+    for ( unsigned j=0; j<channels; ++j ) {
       *buffer++ = (MY_TYPE) (lastValues[j] * SCALE * 0.05);
-	  // update sawtooth test-signal
-	  const double BASE_RATE = 0.04;
+      // update sawtooth test-signal
+      const double BASE_RATE = 0.04;
       lastValues[j] += BASE_RATE * (j+1+(j*0.1));
       if ( lastValues[j] >= 1.0 ) lastValues[j] -= 2.0;
     }
@@ -123,7 +114,7 @@ double *data = NULL;
 
 void rtaudioInit()
 {
-	printf("Includes RtAudio software, copyright 2012 Gary P. Scavone.\n");
+  printf("Includes RtAudio software, copyright 2012 Gary P. Scavone.\n");
 
   if ( dac.getDeviceCount() < 1 ) {
     std::cout << "\nNo audio devices found!\n";
@@ -152,9 +143,9 @@ void rtaudioInit()
   catch ( RtError& e ) {
     e.printMessage();
   }
-	fCritsec = InitializeCriticalSectionAndSpinCount(critsec, 0x00000400) == TRUE;
-	if (!fCritsec)
-		printf("failed to init critsec.  Misbehavior likely.\n");
+  fCritsec = InitializeCriticalSectionAndSpinCount(critsec, 0x00000400) == TRUE;
+  if (!fCritsec)
+    printf("failed to init critsec.  Misbehavior likely.\n");
 }
 
 void rtaudioTerm()
@@ -166,10 +157,10 @@ void rtaudioTerm()
 #if 0
 void rtaudioPause(bool f)
 {
-	std::cout << "rtaudioPause " << f << "\n";
-	if (f /*&& dac.isStreamRunning()*/)
-		dac.stopStream(); // drain buffer (instead of abortStream, I think)
-	if (!f /*&& !dac.isStreamRunning()*/)
-		dac.startStream();
+  std::cout << "rtaudioPause " << f << "\n";
+  if (f /*&& dac.isStreamRunning()*/)
+    dac.stopStream(); // drain buffer (instead of abortStream, I think)
+  if (!f /*&& !dac.isStreamRunning()*/)
+    dac.startStream();
 }
 #endif
