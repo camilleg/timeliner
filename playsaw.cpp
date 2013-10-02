@@ -48,7 +48,7 @@ void rtaudioTick(const short* ps, const int cs)
     visMax = 0;
   }
   vis = 0;
-  std::copy(ps, cs, vps+visMax);
+  std::copy(ps, ps+cs, vps+visMax);
   visMax += cs;
   if (visMax >= sizeof(vps)/sizeof(vps[0])) {
     printf("\n\toverflow averted, but timeliner will crash!\n\n");

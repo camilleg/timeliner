@@ -183,12 +183,10 @@ class arLock {
 #else
   pthread_mutex_t _mutex;
 #endif
-  const char* _name;
 public:
 
 #ifdef _MSC_VER
-  arLock(const char* name) : _fOwned(true) {
-    _setName( name );
+  arLock() : _fOwned(true) {
     _mutex = CreateMutex(NULL, FALSE, NULL);
     const DWORD e = GetLastError();
     if (e == ERROR_ALREADY_EXISTS && _mutex) {
@@ -199,13 +197,11 @@ public:
 	  // success
       return;
     if (e == ERROR_ALREADY_EXISTS) {
-      std::cerr << "arLock warning: CreateMutex('" << name <<
-        "') failed (already exists).\n";
+      std::cerr << "arLock warning: CreateMutex failed (already exists).\n";
       return;
     }
     if (e == ERROR_ACCESS_DENIED) {
-      std::cerr << "arLock warning: CreateMutex('" << name <<
-        "') failed (access denied); backing off.\n";
+      std::cerr << "arLock warning: CreateMutex failed (access denied); backing off.\n";
 LBackoff:
       // _mutex = OpenMutex(SYNCHRONIZE, FALSE, name);
       // Fall back to a mutex of scope "app" not "the entire PC".
@@ -215,21 +211,13 @@ LBackoff:
       }
     }
     else if (e == ERROR_PATH_NOT_FOUND) {
-      std::cerr << "arLock warning: CreateMutex('" << name <<
-        "') failed (backslash?); backing off.\n";
+      std::cerr << "arLock warning: CreateMutex failed (backslash?); backing off.\n";
       goto LBackoff;
     }
     else {
-      std::cerr << "arLock warning: CreateMutex('" << name <<
-        "') failed; backing off.\n";
+      std::cerr << "arLock warning: CreateMutex failed; backing off.\n";
       goto LBackoff;
     }
-  }
-
-  void _setName(const char* name) {
-    if (!name)
-      name = "UNNAMED";
-    std::copy(name, name+strlen(name)+1, _name);
   }
 
   bool valid() const { return _mutex != NULL; }
@@ -239,7 +227,6 @@ LBackoff:
       (void)ReleaseMutex(_mutex); // paranoid
       CloseHandle(_mutex);
     }
-    delete[] _name;
   }
 
   void lock() {
@@ -287,21 +274,18 @@ LBackoff:
 
 #else
 
-  arLock(const char* name) : _name(name) {
+  arLock() {
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_DEFAULT);
     pthread_mutex_init(&_mutex, &attr);
     pthread_mutexattr_destroy(&attr);
-    //fprintf(stderr, "%s created\n", _name);
   }
   ~arLock() {
-    //fprintf(stderr, "%s destroy\n", _name);
     pthread_mutex_destroy(&_mutex);
   }
 
   void lock() {
-    //fprintf(stderr, "%s lock\n", _name);
     // A relative time (a duration) requires pthread_mutex_timedlock_np
     // or pthread_mutex_reltimedlock_np, but Ubuntu doesn't define those.
     struct timespec t;
@@ -309,7 +293,6 @@ LBackoff:
     t.tv_sec += 1; // Overkill.  Slower than that really shouldn't happen with only 3 threads.
     const int r = pthread_mutex_timedlock(&_mutex, &t);
     if (r != 0) {
-      //fprintf(stderr, "internal mutex error, %s %d: ", _name, r);
       switch(r) {
 	case EINVAL: fprintf(stderr, "EINVAL\n"); break;
 	case ETIMEDOUT: fprintf(stderr, "ETIMEDOUT\n"); break;
@@ -319,7 +302,6 @@ LBackoff:
       }
       quit("internal mutex error");
     }
-    //fprintf(stderr, "%s locked\n", _name);
   }
   void unlock() {
     pthread_mutex_unlock(&_mutex);
@@ -339,14 +321,14 @@ public:
   ~arGuard() { _l.unlock(); }
 };
 
-arLock vlockAudio("vlockAudio"); // guards next three
+arLock vlockAudio; // guards next three
 int vnumSamples = 0; // high-low-water-mark between samplewriter() and samplereader()
 const short* vpsSamples = NULL; // vpsSamples and visSamples are set by samplewriter() via emit(), and cleared by samplereader().
 int visSamples = 0;
 
 class S2Splay {
 public:
-  S2Splay() : _lock("s2s"), _sPlay(-1.0), _tPlay(appnow()), _fPlaying(false), _sampBgn(10000) {}
+  S2Splay() : _sPlay(-1.0), _tPlay(appnow()), _fPlaying(false), _sampBgn(10000) {}
   bool playing() const { arGuard _(_lock); return _fPlaying; }
   void soundpause() { arGuard _(_lock); _fPlaying = false; }
 
