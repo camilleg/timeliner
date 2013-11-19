@@ -855,6 +855,9 @@ static void RgbFromMMM(Float* a, int iColormap)
 static Float ByteFromMMM(const Float* a, int iColormap)
 {
   switch (iColormap) {
+    case 5: // waveform for shader
+      return a[2]; // lerp(0.99f, a[2], a[1]);
+      break;
     case 4: // oracle
       return a[2]; // max
       break;

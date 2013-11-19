@@ -528,22 +528,57 @@ class Feature {
     GLuint tex[vecLim];
   };
 
+  double testpattern(const int t) const { // return 0.0 to 1.0
+    return sin(t / 6.28 / 7) * 0.5 + 0.5;
+  //return (t%30)/30.0;
+  }
+
+  template <class T> const T& min3(const T& a, const T& b, const T& c) { return std::min(a, std::min(b, c)); }
+  template <class T> const T& max3(const T& a, const T& b, const T& c) { return std::max(a, std::max(b, c)); }
+  template <class T> const T avg(const T& a, const T& b) { return (a+b)*0.5; }
+
 public:
   int cchunk;
   std::vector<Slartibartfast> rgTex;
 
   // Todo: grow this into a waveform feature, then move it into timeliner_pre.cpp.
   Feature(): _fValid(true) {
-    _iColormap = 1; // ?
-    _vectorsize = 4; // pixel height
-    _period = 1.0f/SR;	// waveform's sample rate
+    _iColormap = 5; // waveform for shader
+    _vectorsize = 50; // number of vertical texels, at most 40 to 50
+    _period = 1.0f/SR; // waveform's sample rate
     const int slices = wavcsamp;
     _cz = slices*_vectorsize;
-    float* pz = new float[_cz];
-    for (int t=0; t < slices; ++t)
-      for (int s=0; s < _vectorsize; ++s)
-	pz[t*_vectorsize+s] = t%100<40 ? 0.0f : 0.3f + 0.69f*drand48(); // test pattern
-//	pz[t*_vectorsize+s] = drand48()*0.5 + drand48()*0.5 * (float(t)/(slices-1));
+    float* pz = new float[_cz](); // () means "value initialization" to all zeros, the background behind the waveform-line foreground.
+    // Test pattern.  t is horizontal.  s is vertical.
+    for (int t=0; t < slices; ++t) {
+#if 0
+      for (int s=0; s < _vectorsize; ++s) {
+	pz[t*_vectorsize+s] = 0.0;
+//	pz[t*_vectorsize+s] = ((t+3*s)%60)/60.0;
+      }
+#endif
+      // When testpattern() is steep, to fill in gaps in the curve,
+      // set to 1.0 not just the texel for testpattern(t),
+      // but also texels above and below that (in the s dimension),
+      // over the full range of { wav, avg(wav,wavPrev), avg(wav,wavNext) }.
+      //
+      // (Can't anti-alias conventionally, because shader's palette has only one value reserved for the waveform, 1.0 i.e. 127.)
+      //
+      // (Gaps still happen when vertically zoomed out, suppressing some rows of texels.  Avoiding that demands a 2D texturemap
+      // instead of 1D.  But that would vertically smear the spectrogram behind the waveform.  Pick one defect or the other.
+      // What's worse, gaps in curve or smeared spectrogram values?)
+
+      const double wav = testpattern(t);
+      const double wavPrev = testpattern(std::max(t-1, 0));
+      const double wavNext = testpattern(std::min(t+1, slices-1));
+      const double wavMin = min3(avg(wav, wavPrev), wav, avg(wav, wavNext));
+      const double wavMax = max3(avg(wav, wavPrev), wav, avg(wav, wavNext));
+
+      const int sWavMin = std::min(std::max(int(round(wavMin*_vectorsize)), 0), _vectorsize-1);
+      const int sWavMax = std::min(std::max(int(round(wavMax*_vectorsize)), 0), _vectorsize-1);
+
+      for (int s = sWavMin; s <= sWavMax; ++s) pz[t*_vectorsize + s] = 1.0;
+    }
     _pz = pz;
     strcpy(_name, "waveform for eeg");
     makeMipmaps();
@@ -553,7 +588,7 @@ public:
     if (mb == mbUnknown) {
       mb = gpuMBavailable() > 0.0f ? mbPositive : mbZero;
       if (!hasGraphicsRAM())
-	warn("Found no dedicated graphics RAM.  May run slowly.");
+	warn("Found no dedicated graphics RAM.  Might run slowly.");
     }
     const Mmap marshaled_file(dirname + "/" + filename);
     if (!marshaled_file.valid())
@@ -770,7 +805,7 @@ void shaderInit()
 
   glActiveTexture(GL_TEXTURE0); // use texture unit 0
   assert(     glGetUniformLocation(myPrg, "heatmap") >= 0);
-  glUniform1i(glGetUniformLocation(myPrg, "heatmap"), 0); // Bind sampler to texture unit 0.  http://www.opengl.org/wiki/Texture#Texture_image_units
+  glUniform1i(glGetUniformLocation(myPrg, "heatmap"), 0); // Bind sampler to texture unit 0.  www.opengl.org/wiki/Texture#Texture_image_units
 }
 
 // Top of timeline, measured from bottom of window (y==0) to top of window (y==1).
@@ -1323,7 +1358,7 @@ void keyboard(const unsigned char key, const int x, int /*y*/)
   switch(key) {
     case 3: // ctrl+C
       vfQuit = true;
-      snooze(0.6); // let other threads notice vfQuit
+      snooze(0.4); // let other threads notice vfQuit
       exit(0);
     case ' ':
       // Snap offscreen cursor back onscreen,
@@ -1845,6 +1880,10 @@ int main(int argc, char** argv)
   glDisable(GL_LIGHTING);
 
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+  // How make one of these per channel, in timeliner_pre?  That's an HTK feature, after all.;;;;
+  features.push_back(new Feature());
+  features.push_back(new Feature());
 
   info("reading marshaled htk features");
   // Ugly and brute-force.  Just let filenames fail if they don't exist.
