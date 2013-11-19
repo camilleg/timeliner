@@ -1345,6 +1345,22 @@ double xyPanPrev[2] = {0.0, 0.0};
 inline double xFromMouse(const double xM) { return       xM/pixelSize[0]; }
 inline double yFromMouse(const double yM) { return 1.0 - yM/pixelSize[1]; }
 
+void warnIgnoreKeystroke(const unsigned char key)
+{
+  printf("Ignoring keystroke ");
+  if (!isascii(key))
+    printf("<0x%02x>", key & 0xFF);  // outside ASCII range 
+  else if (isprint(key))
+    printf("%c", key);
+  else if (key < ' ')
+    printf("<CTRL+%c>", key+'@');
+  else if (key == ' ')
+    printf("<SPACE>");
+  else
+    printf("<DEL>");
+  printf("\n");
+}
+
 void keyboard(const unsigned char key, const int x, int /*y*/)
 {
   if (!fReshaped)
@@ -1357,6 +1373,7 @@ void keyboard(const unsigned char key, const int x, int /*y*/)
 
   switch(key) {
     case 3: // ctrl+C
+    case 23: // ctrl+W
       vfQuit = true;
       snooze(0.4); // let other threads notice vfQuit
       exit(0);
@@ -1394,7 +1411,7 @@ void keyboard(const unsigned char key, const int x, int /*y*/)
       scrollwheel(xFromMouse(x), false, true);
       break;
     default:
-      printf("Ignoring keystroke %d\n", key); // see www.bbdsoft.com/ascii.html
+      warnIgnoreKeystroke(key);
       break;
   }
 }
