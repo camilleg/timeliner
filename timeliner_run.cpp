@@ -514,7 +514,8 @@ float gpuMBavailable()
 }
 
 #ifdef _MSC_VER
-inline float drand48() { return float(rand()) / float(RAND_MAX); } 
+inline float drand48() { return float(rand()) / float(RAND_MAX); }
+inline double round(const double x) { return floor(x + 0.5); }
 #endif
 
 class Feature {
