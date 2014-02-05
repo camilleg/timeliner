@@ -541,6 +541,8 @@ public:
   int cchunk;
   std::vector<Slartibartfast> rgTex;
 
+#undef waveform_as_feature
+#ifdef waveform_as_feature
   // Todo: grow this into a waveform feature, then move it into timeliner_pre.cpp.
   Feature(): _fValid(true) {
     _iColormap = 5; // waveform for shader
@@ -583,6 +585,7 @@ public:
     strcpy(_name, "waveform for eeg");
     makeMipmaps();
   }
+#endif
 
   Feature(int /*iColormap*/, const std::string& filename, const std::string& dirname): _fValid(false) {
     if (mb == mbUnknown) {
@@ -1898,10 +1901,11 @@ int main(int argc, char** argv)
   glDisable(GL_LIGHTING);
 
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
+#ifdef waveform_as_feature
   // How make one of these per channel, in timeliner_pre?  That's an HTK feature, after all.;;;;
   features.push_back(new Feature());
   features.push_back(new Feature());
+#endif
 
   info("reading marshaled htk features");
   // Ugly and brute-force.  Just let filenames fail if they don't exist.
