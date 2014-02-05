@@ -496,14 +496,13 @@ float gpuMBavailable()
   // AMD/ATI equivalent: WGL_AMD_gpu_association wglGetGPUIDsAMD wglGetGPUIDsAMD wglGetGPUInfoAMD
   // www.opengl.org/registry/specs/ATI/meminfo.txt
 #if 0
-  #define GL_GPU_MEM_INFO_TOTAL_AVAILABLE_MEM_NVX 0x9048
+  #define GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX 0x9047
   GLint total_mem_kb = 0;
-  glGetIntegerv(GL_GPU_MEM_INFO_TOTAL_AVAILABLE_MEM_NVX, &total_mem_kb);
-  // zx81 has 1048576 kb = 1 GB.
+  glGetIntegerv(GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &total_mem_kb);
 #endif
-  #define GL_GPU_MEM_INFO_CURRENT_AVAILABLE_MEM_NVX 0x9049
+  #define GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX 0x9049
   GLint cur_avail_mem_kb = 0;
-  glGetIntegerv(GL_GPU_MEM_INFO_CURRENT_AVAILABLE_MEM_NVX, &cur_avail_mem_kb);
+  glGetIntegerv(GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &cur_avail_mem_kb);
   return cur_avail_mem_kb/1000.0F;
 
   // A feature of width 65536 (almost 11 minutes at 100 samples/sec)
@@ -695,6 +694,7 @@ public:
 	warn("Running out of graphics RAM.  Try increasing the environment variable timeliner_zoom to 15 or so.");
 #else
 	// Less than 50 MB free may hang X.  Mouse responsive, Xorg 100% cpu, network up, console frozen.
+	// Or, the next request may "go negative", mb0-mb1<0.
 	warn("Running out of graphics RAM.  Try export timeliner_zoom=15.");
 #endif
       }
