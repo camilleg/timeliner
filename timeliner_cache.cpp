@@ -342,7 +342,7 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
     exit(1);
   }
   if (width > int(CQuartet_widthMax)) {
-    std::cout << "error: recompile timeliner's ruby extension main.cpp with CQuartet_widthMax >= " << width << ", not " << CQuartet_widthMax << ".\n";
+    std::cout << "error: recompile with timeliner_cache.h's CQuartet_widthMax >= " << width << ", not " << CQuartet_widthMax << ".\n";
     exit(1);
   }
 
@@ -362,7 +362,13 @@ CHello::CHello(const short* const aSrc, const long cs, const Float hzArg, const 
   }
 #endif
   const unsigned cz = fShrunkleaves ? cs : cLeaves*czNode;
-  layers->push_back(new VD(cz, 0.0));
+  try {
+    layers->push_back(new VD(cz, 0.0));
+  }
+  catch (const std::bad_alloc&) {
+    std::cerr << "Out of memory.  Failed to allocate vector of " << cz << " floats, about " << cz*4/1000000 << " MB.\n";
+    throw;
+  }
   cb += cz * sizeof(Float);
 #ifdef VERBOSE
   if (cLeaves > 500000)
