@@ -1,4 +1,4 @@
-CFLAGS = -O3 -Wall -ffast-math -fexpensive-optimizations -fomit-frame-pointer -maccumulate-outgoing-args -fno-exceptions -pedantic
+CFLAGS = -O3 -Wall -ffast-math -fexpensive-optimizations -fomit-frame-pointer -maccumulate-outgoing-args -pedantic
 # When compiling on a 32-bit OS, add -D_FILE_OFFSET_BITS=64
 # CFLAGS += -DNDEBUG 
 # CFLAGS += -g -O0
