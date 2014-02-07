@@ -543,20 +543,20 @@ public:
 
 #undef waveform_as_feature
 #ifdef waveform_as_feature
-  // Todo: grow this into a waveform feature, then move it into timeliner_pre.cpp.
-  Feature(): _fValid(true) {
-    _iColormap = 5; // waveform for shader
-    _vectorsize = 50; // number of vertical texels, at most 40 to 50
-    _period = 1.0f/SR; // waveform's sample rate
+  // Todo: grow this into a waveform feature, then move it into timeliner_pre.cpp, then replace testpattern() with actual .WAV file.
+  Feature(): m_fValid(true) {
+    m_iColormap = 5; // waveform for shader
+    m_vectorsize = 50; // number of vertical texels, at most 40 to 50
+    m_period = 1.0f/SR; // waveform's sample rate
     const int slices = wavcsamp;
-    _cz = slices*_vectorsize;
-    float* pz = new float[_cz](); // () means "value initialization" to all zeros, the background behind the waveform-line foreground.
+    m_cz = slices*m_vectorsize;
+    float* pz = new float[m_cz](); // () means "value initialization" to all zeros, the background behind the waveform-line foreground.
     // Test pattern.  t is horizontal.  s is vertical.
     for (int t=0; t < slices; ++t) {
 #if 0
-      for (int s=0; s < _vectorsize; ++s) {
-	pz[t*_vectorsize+s] = 0.0;
-//	pz[t*_vectorsize+s] = ((t+3*s)%60)/60.0;
+      for (int s=0; s < m_vectorsize; ++s) {
+	pz[t*m_vectorsize+s] = 0.0;
+//	pz[t*m_vectorsize+s] = ((t+3*s)%60)/60.0;
       }
 #endif
       // When testpattern() is steep, to fill in gaps in the curve,
@@ -576,18 +576,18 @@ public:
       const double wavMin = min3(avg(wav, wavPrev), wav, avg(wav, wavNext));
       const double wavMax = max3(avg(wav, wavPrev), wav, avg(wav, wavNext));
 
-      const int sWavMin = std::min(std::max(int(round(wavMin*_vectorsize)), 0), _vectorsize-1);
-      const int sWavMax = std::min(std::max(int(round(wavMax*_vectorsize)), 0), _vectorsize-1);
+      const int sWavMin = std::min(std::max(int(round(wavMin*m_vectorsize)), 0), m_vectorsize-1);
+      const int sWavMax = std::min(std::max(int(round(wavMax*m_vectorsize)), 0), m_vectorsize-1);
 
-      for (int s = sWavMin; s <= sWavMax; ++s) pz[t*_vectorsize + s] = 1.0;
+      for (int s = sWavMin; s <= sWavMax; ++s) pz[t*m_vectorsize + s] = 1.0;
     }
-    _pz = pz;
-    strcpy(_name, "waveform for eeg");
+    m_pz = pz;
+    strcpy(m_name, "waveform for eeg");
     makeMipmaps();
   }
 #endif
 
-  Feature(int /*iColormap*/, const std::string& filename, const std::string& dirname): _fValid(false) {
+  Feature(int /*iColormap*/, const std::string& filename, const std::string& dirname): m_fValid(false) {
     if (mb == mbUnknown) {
       mb = gpuMBavailable() > 0.0f ? mbPositive : mbZero;
       if (!hasGraphicsRAM())
@@ -598,7 +598,7 @@ public:
       return;
     binaryload(marshaled_file.pch(), marshaled_file.cch()); // stuff many member variables
     makeMipmaps();
-    _fValid = true;
+    m_fValid = true;
     // ~Mmap closes file
   };
 
@@ -606,20 +606,20 @@ public:
 
   void binaryload(const char* pch, long cch) {
     assert(4 == sizeof(float));
-    strcpy(_name, pch);				pch += strlen(_name);
-    _iColormap = int(*(float*)pch);		pch += sizeof(float);
-    _period = *(float*)pch;			pch += sizeof(float);
+    strcpy(m_name, pch);				pch += strlen(m_name);
+    m_iColormap = int(*(float*)pch);		pch += sizeof(float);
+    m_period = *(float*)pch;			pch += sizeof(float);
     const int slices = int(*(float*)pch);	pch += sizeof(float);
-    _vectorsize = int(*(float*)pch);		pch += sizeof(float);
-    _pz = (const float*)pch; // _cz floats.  Not doubles.
-    _cz = (cch - long(strlen(_name) + 4*sizeof(float))) / 4;
+    m_vectorsize = int(*(float*)pch);		pch += sizeof(float);
+    m_pz = (const float*)pch; // m_cz floats.  Not doubles.
+    m_cz = (cch - long(strlen(m_name) + 4*sizeof(float))) / 4;
 #ifndef NDEBUG
-    printf("debugging feature: name %s, colormap %d, period %f, slices %d, width %d, cz %lu.\n", _name, _iColormap, _period, slices, _vectorsize, _cz);
+    printf("debugging feature: name %s, colormap %d, period %f, slices %d, width %d, cz %lu.\n", m_name, m_iColormap, m_period, slices, m_vectorsize, m_cz);
 #endif
-    if (_iColormap<0 || _period<=0.0 || slices<=0 || _vectorsize<=0) {
-      quit("binaryload: feature '" + std::string(_name) + "' has corrupt data");
+    if (m_iColormap<0 || m_period<=0.0 || slices<=0 || m_vectorsize<=0) {
+      quit("binaryload: feature '" + std::string(m_name) + "' has corrupt data");
     }
-    assert(slices*_vectorsize == _cz);
+    assert(slices*m_vectorsize == m_cz);
 #ifdef NDEBUG
     _unused(slices);
 #else
@@ -627,9 +627,9 @@ public:
 #ifndef _MSC_VER
 	// VS2013 only got std::isnormal and std::fpclassify in July 2013:
 	// http://blogs.msdn.com/b/vcblog/archive/2013/07/19/c99-library-support-in-visual-studio-2013.aspx
-	for (int i=0; i<_cz; ++i) {
-    if (!std::isnormal(_pz[i]) && _pz[i] != 0.0) {
-	printf("binaryload: feature's float %d of %ld is bogus: class %d, value %f\n", i, _cz, std::fpclassify(_pz[i]), _pz[i]);
+	for (int i=0; i<m_cz; ++i) {
+    if (!std::isnormal(m_pz[i]) && m_pz[i] != 0.0) {
+	printf("binaryload: feature's float %d of %ld is bogus: class %d, value %f\n", i, m_cz, std::fpclassify(m_pz[i]), m_pz[i]);
 	quit("");
       }
     }
@@ -637,10 +637,10 @@ public:
 #endif
   };
 
-  bool fValid() const { return _fValid; }
-  int vectorsize() const { return _vectorsize; }
-  int samples() const { return _cz / _vectorsize; }
-  const char* name() const { return _name; }
+  bool fValid() const { return m_fValid; }
+  int vectorsize() const { return m_vectorsize; }
+  int samples() const { return m_cz / m_vectorsize; }
+  const char* name() const { return m_name; }
 
   void makeMipmaps() {
     // Adaptive subsample is too tricky, until I can better predict GL_GPU_MEM_INFO_CURRENT_AVAILABLE_MEM_NVX.
@@ -675,12 +675,12 @@ public:
 
     rgTex.resize(cchunk);
     for (int ichunk=0; ichunk<cchunk; ++ichunk) {
-      glGenTextures(_vectorsize, rgTex[ichunk].tex);
-      for (int j=0; j < _vectorsize; ++j)
+      glGenTextures(m_vectorsize, rgTex[ichunk].tex);
+      for (int j=0; j < m_vectorsize; ++j)
 	prepTextureMipmap(rgTex[ichunk].tex[j]);
     }
 
-    const CHello cacheHTK(_pz, _cz, 1.0f/_period, subsample, _vectorsize);
+    const CHello cacheHTK(m_pz, m_cz, 1.0f/m_period, subsample, m_vectorsize);
     glEnable(GL_TEXTURE_1D);
     const float mb0 = hasGraphicsRAM() ? gpuMBavailable() : 0.0f;
     // www.opengl.org/archives/resources/features/KilgardTechniques/oglpitfall/ #5 Not Setting All Mipmap Levels.
@@ -718,7 +718,7 @@ public:
       cacheHTK.getbatchByte(bufByte,
 	  lerp(chunkL, tShowBound[0], tShowBound[1]),
 	  lerp(chunkR, tShowBound[0], tShowBound[1]),
-	  vectorsize(), width, _iColormap);
+	  vectorsize(), width, m_iColormap);
       for (int j=0; j<vectorsize(); ++j) {
 	assert(glIsTexture(rgTex[ichunk].tex[j]) == GL_TRUE);
 	glBindTexture(GL_TEXTURE_1D, rgTex[ichunk].tex[j]);
@@ -729,13 +729,13 @@ public:
   };
 
 private:
-  bool _fValid;
-  int _iColormap;
-  float _period;	// seconds per sample
-  int _vectorsize;	// e.g., how many frequency bins in a spectrogram
-  const float* _pz;	// _pz[0.._cz] is the (vectors of) raw data
-  long _cz;
-  char _name[1000];
+  bool m_fValid;
+  int m_iColormap;
+  float m_period;	// seconds per sample
+  int m_vectorsize;	// e.g., how many frequency bins in a spectrogram
+  const float* m_pz;	// m_pz[0..m_cz] is the (vectors of) raw data
+  long m_cz;
+  char m_name[1000];
 };
 int Feature::mb = mbUnknown;
 std::vector<Feature*> features;
