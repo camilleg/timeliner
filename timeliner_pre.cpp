@@ -460,6 +460,15 @@ void marshal(const char* filename, Feature feat) {
 #ifndef _MSC_VER
 bool CopyFile(const char* filenameSrc, const char* filenameDst)
 {
+#if 1
+  // Until mixed.wav can be converted from other formats.
+  // Fully qualify path of filenameSrc, if needed.
+  const std::string src = filenameSrc[0] == '/' ? filenameSrc : get_current_dir_name() + std::string("/") + filenameSrc ;
+  // std::cout << "Making symlink from " << src << " to  " << filenameDst << "\n";
+  (void)remove(filenameDst); // otherwise symlink() fails
+  (void)symlink(src.c_str(), filenameDst);
+  return true;
+#else
   const size_t cb = 4194304; // 4 MB
   char buf[cb];
   const int src = open(filenameSrc, O_RDONLY, 0);
@@ -475,12 +484,13 @@ bool CopyFile(const char* filenameSrc, const char* filenameDst)
     if (write(dst, buf, size) < 0)
       break;
   }
-  // Could do while (read()>0 && write>=0), but then
+  // Could do while (read()>0 && write()>=0), but then
   // && must be a "sequence point" so the write happens after the read.
   // Brittle and subtle, e.g. in C90 Standard section 6.3.
   close(src);
   close(dst);
   return true;
+#endif
 }
 #endif
 
@@ -618,6 +628,7 @@ int mainCore(int argc, char** argv)
     // todo: convert to 16-bit 16khz, before storing in wavS16.  Without calling system("sox ..."), so it works in win32.
 
 
+    // info("copying or symlinking " + wavSrc + " to " + dirMarshal + "/mixed.wav");
 #ifdef too_slow_for_huge_files
     {
       std::ifstream src(wavSrc.c_str(), std::ios::binary);
