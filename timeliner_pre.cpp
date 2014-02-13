@@ -30,6 +30,7 @@
 #define getcwd(a,b) _getcwd(a,b)
 #define mkdir(a,b)  _mkdir(a)
 #define chdir(a)    _chdir(a)
+inline double round(const double x) { return floor(x + 0.5); }
 #else
 #include <arpa/inet.h> // ntohl(), etc
 #include <gsl/gsl_wavelet.h>
@@ -362,7 +363,7 @@ public:
     const double undersample = std::max(msec_resolution*1e-3 * SR, 1.0);
 
     m_period = undersample/SR; // waveform's sample rate
-    const int slices = wavcsamp/undersample;
+    const int slices = int(wavcsamp/undersample);
     m_cz = slices*m_vectorsize;
     m_data = new float[m_cz](); // () means "value initialization" to all zeros, the background behind the waveform-line foreground.
     // Test pattern.  t is horizontal.  s is vertical.
@@ -379,14 +380,14 @@ public:
 	// (Gaps still happen when vertically zoomed out, suppressing some rows of texels.  Avoiding that demands a 2D texturemap
 	// instead of 1D.  But that would vertically smear the spectrogram behind the waveform.  Pick one defect or the other.
 	// What's worse, gaps in curve or smeared spectrogram values?)
-	const double wav = sampleFromWav(channel, t*undersample);
+	const double wav = sampleFromWav(channel, long(t*undersample));
 	const double wavPrev = sampleFromWav(channel, std::max(t-1, 0));
 	const double wavNext = sampleFromWav(channel, std::min(t+1, slices-1));
 	wavMin = min3(avg(wav, wavPrev), wav, avg(wav, wavNext));
 	wavMax = max3(avg(wav, wavPrev), wav, avg(wav, wavNext));
       } else {
 	// Keep the curve continuous by going one sample too far in each direction (the -1 and +1 in minmaxFromWav)
-	minmaxFromWav(wavMin, wavMax, channel, t*undersample, (t+1)*undersample);
+	minmaxFromWav(wavMin, wavMax, channel, long(t*undersample), long((t+1)*undersample));
       }
       const int sWavMin = clamp(0, int(round(wavMin*m_vectorsize)), m_vectorsize-1);
       const int sWavMax = clamp(0, int(round(wavMax*m_vectorsize)), m_vectorsize-1);
