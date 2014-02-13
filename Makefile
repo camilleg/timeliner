@@ -13,7 +13,7 @@ OBJS_ALL = $(OBJS_RUN) $(OBJS_PRE)
 LIBS_PRE = -lsndfile -lgsl -lblas 
 LIBS_RUN = -lasound -lglut -lGLU -lGL -lGLEW -L/usr/X11R6/lib -lXmu -lXi -lXext -lX11 -lsndfile -lpthread -lrt
 
-all: testmono
+all: test-mono
 
 clean:
 	rm -f timeliner_run timeliner_prp $(OBJS_ALL) timeliner.log example/mono/marshal/*
@@ -26,17 +26,12 @@ timeliner_run: $(OBJS_RUN)
 timeliner_prp: $(OBJS_PRE)
 	g++ $(CFLAGS) -o $@ $(OBJS_PRE) $(LIBS_PRE)
 
-testEEG: timeliner_run Makefile example/EEG/marshal/mixed.wav
+test-EEG: timeliner_run Makefile example/EEG/marshal/mixed.wav
 	export ALSA_CARD=0 && ./timeliner_run example/EEG/marshal
 example/EEG/marshal/mixed.wav: timeliner_prp /r/timeliner/testcases/eeg/eeg.rec example/EEG/config.txt
 	cd example && ../timeliner_prp EEG/marshal EEG/config.txt
 
-teststereo: timeliner_run Makefile example/stereo/marshal/mixed.wav
+test-stereo: timeliner_run Makefile example/stereo/marshal/mixed.wav
 	export ALSA_CARD=0 && ./timeliner_run example/stereo/marshal
 example/stereo/marshal/mixed.wav: timeliner_prp example/stereo/choral-stereo.wav example/stereo/config.txt
 	cd example && ../timeliner_prp stereo/marshal stereo/config.txt
-
-testmono: timeliner_run Makefile example/mono/marshal/mixed.wav
-	export ALSA_CARD=0 && ./timeliner_run example/mono/marshal
-example/mono/marshal/mixed.wav: timeliner_prp example/mono/choral.wav example/mono/config.txt
-	cd example && ../timeliner_prp mono/marshal mono/config.txt
