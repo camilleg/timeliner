@@ -673,9 +673,9 @@ const CQuartet CHello::recurse(const std::vector<VD*>* const layers, const Float
       // Careful.  iz usually indexes a flat list of czNode-tuple floats,
       // so iz/czNode is the "pure" index.  But now we index width-tuples,
       // so multiply by w.
-	  if (iz/czNode*w >= L.size())
-		  return CQuartet(L, L.size()-w, w, true);		// workaround for leaf just past end of vector (why?);;;;
-	  assert(iz/czNode*w < L.size());
+      if (iz/czNode*w >= L.size())
+	return CQuartet(L, L.size()-w, w, true);// workaround for leaf just past end of vector (why?);;;;
+      assert(iz/czNode*w < L.size());
       return CQuartet(L, iz/czNode*w, w, true); // leaf, shrunk, vector.
     }
     return CQuartet(L, iz+2, w);                // leaf, nonshrunk.  e.g., wav.

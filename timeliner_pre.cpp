@@ -240,7 +240,7 @@ std::string htkFromWav(const int channel, int iKind, const std::string& infile) 
 }
 
 void readHTK(const std::string& caption, const std::string& filename,
-    double& period, long& vectorsize, float*& data, size_t& cz)
+    double& period, int& vectorsize, float*& data, size_t& cz)
 {
   const Mmap* foo = new Mmap(filename, false);
   const char* pch = foo->pch();
@@ -325,9 +325,15 @@ class Feature {
   const int m_iColormap;
   const std::string m_name;
   double m_period;
-  long m_vectorsize;
+  int m_vectorsize;
   float* m_data;
   size_t m_cz;
+
+  template <class T> const T& min3(const T& a, const T& b, const T& c) const { return std::min(a, std::min(b, c)); }
+  template <class T> const T& max3(const T& a, const T& b, const T& c) const { return std::max(a, std::max(b, c)); }
+  template <class T> const T avg(const T& a, const T& b) { return (a+b)*0.5; }
+  template <class T> const T clamp(const T& tMin, const T& t, const T& tMax) const { return std::min(std::max(tMin, t), tMax); }
+
 public:
   Feature(int channel, int iColormap, const std::string& filename, const std::string& caption) :
     m_iColormap(iColormap),
@@ -341,6 +347,67 @@ public:
     validate();
     if (0 != remove(htkFilename.c_str()))
       warn("failed to remove " + htkFilename);
+  }
+
+  Feature(int channel, const std::string& /*filename*/) :
+    m_iColormap(5 /*shader*/ ),
+    m_name("waveform-as-feature"),
+    m_data(NULL),
+    m_cz(0)
+  {
+    std::cout << "Constructing waveform-feature for channel " << channel << "\n";
+    m_vectorsize = 50; // number of vertical texels, at most 40 to 50
+
+    const double msec_resolution = 5.3; // 0.3 is useful, 10.0 computes mipmaps way faster during development
+    const double undersample = std::max(msec_resolution*1e-3 * SR, 1.0);
+
+    m_period = undersample/SR; // waveform's sample rate
+    const int slices = wavcsamp/undersample;
+    m_cz = slices*m_vectorsize;
+    m_data = new float[m_cz](); // () means "value initialization" to all zeros, the background behind the waveform-line foreground.
+    // Test pattern.  t is horizontal.  s is vertical.
+    for (int t=0; t < slices; ++t) {
+      double wavMin, wavMax;
+      if (undersample == 1.0) {
+	// When sampleFromWav() is steep, to fill in gaps in the curve,
+	// set to 1.0 not just the texel for sampleFromWav(t),
+	// but also texels above and below that (in the s dimension),
+	// over the full span of { wav, avg(wav,wavPrev), avg(wav,wavNext) }.
+	//
+	// (Can't anti-alias conventionally, because shader's palette has only one value reserved for the waveform, 1.0 i.e. 127.)
+	//
+	// (Gaps still happen when vertically zoomed out, suppressing some rows of texels.  Avoiding that demands a 2D texturemap
+	// instead of 1D.  But that would vertically smear the spectrogram behind the waveform.  Pick one defect or the other.
+	// What's worse, gaps in curve or smeared spectrogram values?)
+	const double wav = sampleFromWav(channel, t*undersample);
+	const double wavPrev = sampleFromWav(channel, std::max(t-1, 0));
+	const double wavNext = sampleFromWav(channel, std::min(t+1, slices-1));
+	wavMin = min3(avg(wav, wavPrev), wav, avg(wav, wavNext));
+	wavMax = max3(avg(wav, wavPrev), wav, avg(wav, wavNext));
+      } else {
+	// Keep the curve continuous by going one sample too far in each direction (the -1 and +1 in minmaxFromWav)
+	minmaxFromWav(wavMin, wavMax, channel, t*undersample, (t+1)*undersample);
+      }
+      const int sWavMin = clamp(0, int(round(wavMin*m_vectorsize)), m_vectorsize-1);
+      const int sWavMax = clamp(0, int(round(wavMax*m_vectorsize)), m_vectorsize-1);
+
+      float* pz = m_data+t*m_vectorsize;
+      std::fill(pz+sWavMin, pz+sWavMax+1, 1.0);
+    }
+
+  }
+
+  inline void minmaxFromWav(double& zMin, double& zMax, const int channel, long tMin, long tMax) const {
+    tMin = clamp(0L, tMin-1, wavcsamp);
+    tMax = clamp(0L, tMax+1, wavcsamp);
+    const short* ps = rawS16[channel];
+    zMin = *std::min_element(ps+tMin, ps+tMax) / 65536.0 + 0.5;
+    zMax = *std::max_element(ps+tMin, ps+tMax) / 65536.0 + 0.5;
+    // C++11 std::minmax_element might be slightly faster, but tMax-tMin is usually tiny.
+  }
+
+  inline double sampleFromWav(const int channel, const long t) const { // return 0.0 to 1.0
+    return rawS16[channel][clamp(0L, t, wavcsamp)] / 65536.0 + 0.5;
   }
 
   void validate() const
@@ -363,7 +430,7 @@ public:
   void binarydump(char*& pb, long& cb, float*& pz, long& cz)
   {
     if (!m_data || m_cz==0)
-      quit("no data for feature '" + m_name);
+      quit("no data for feature '" + m_name + "'");
 
 	cb = m_name.size();
     pb = new char[cb+1];
@@ -716,7 +783,7 @@ int mainCore(int argc, char** argv)
     quit("unexpected suffix " + suffix + " of filename " + wavSrc);
   }
 
-  int i=0;
+  int iFeature=0;
   if (chdir(dirMarshal.c_str()) != 0)
     quit("failed to chdir to marshal dir " + dirMarshal);
   if (-1 == system("rm -rf features*")) // will be deprecated, when timeliner_pre generates mipmaps directly
@@ -737,13 +804,20 @@ int mainCore(int argc, char** argv)
       continue;
     }
     for (int chan=0; chan<channels_fake; ++chan) {
-      std::cout << "Constructing a feature from channel " << chan << " of kind " << iColormap << " from source " << wavSrc << " with caption " << caption << "\n"; // << " and " << tokens.size() << " more args\n";
+      std::cout << "Constructing feature from channel " << chan << " of kind " << iColormap << " from source " << wavSrc << " with caption " << caption << "\n"; // << " and " << tokens.size() << " more args\n";
       const Feature feat(chan, iColormap, wavSrc, caption);
-      filename[8] = '0' + i;
+      filename[8] = '0' + iFeature;
       marshal(filename, feat);
-      ++i;
-      assert(i<10); // will be deprecated, when timeliner_pre generates mipmaps directly
+      ++iFeature;
+      assert(iFeature<10); // will be deprecated, when timeliner_pre generates mipmaps directly
     }
+  }
+  for (unsigned chan=0; chan<channels; ++chan) {
+    const Feature feat(chan, wavSrc);
+    filename[8] = '0' + iFeature;
+    marshal(filename, feat);
+    ++iFeature;
+    assert(iFeature<10); // will be deprecated, when timeliner_pre generates mipmaps directly
   }
 
   for (unsigned i=0; i<channels; ++i) delete [] rawS16[i];

@@ -541,52 +541,6 @@ public:
   int cchunk;
   std::vector<Slartibartfast> rgTex;
 
-#undef waveform_as_feature
-#ifdef waveform_as_feature
-  // Todo: grow this into a waveform feature, then move it into timeliner_pre.cpp, then replace testpattern() with actual .WAV file.
-  Feature(): m_fValid(true) {
-    m_iColormap = 5; // waveform for shader
-    m_vectorsize = 50; // number of vertical texels, at most 40 to 50
-    m_period = 1.0f/SR; // waveform's sample rate
-    const int slices = wavcsamp;
-    m_cz = slices*m_vectorsize;
-    float* pz = new float[m_cz](); // () means "value initialization" to all zeros, the background behind the waveform-line foreground.
-    // Test pattern.  t is horizontal.  s is vertical.
-    for (int t=0; t < slices; ++t) {
-#if 0
-      for (int s=0; s < m_vectorsize; ++s) {
-	pz[t*m_vectorsize+s] = 0.0;
-//	pz[t*m_vectorsize+s] = ((t+3*s)%60)/60.0;
-      }
-#endif
-      // When testpattern() is steep, to fill in gaps in the curve,
-      // set to 1.0 not just the texel for testpattern(t),
-      // but also texels above and below that (in the s dimension),
-      // over the full range of { wav, avg(wav,wavPrev), avg(wav,wavNext) }.
-      //
-      // (Can't anti-alias conventionally, because shader's palette has only one value reserved for the waveform, 1.0 i.e. 127.)
-      //
-      // (Gaps still happen when vertically zoomed out, suppressing some rows of texels.  Avoiding that demands a 2D texturemap
-      // instead of 1D.  But that would vertically smear the spectrogram behind the waveform.  Pick one defect or the other.
-      // What's worse, gaps in curve or smeared spectrogram values?)
-
-      const double wav = testpattern(t);
-      const double wavPrev = testpattern(std::max(t-1, 0));
-      const double wavNext = testpattern(std::min(t+1, slices-1));
-      const double wavMin = min3(avg(wav, wavPrev), wav, avg(wav, wavNext));
-      const double wavMax = max3(avg(wav, wavPrev), wav, avg(wav, wavNext));
-
-      const int sWavMin = std::min(std::max(int(round(wavMin*m_vectorsize)), 0), m_vectorsize-1);
-      const int sWavMax = std::min(std::max(int(round(wavMax*m_vectorsize)), 0), m_vectorsize-1);
-
-      for (int s = sWavMin; s <= sWavMax; ++s) pz[t*m_vectorsize + s] = 1.0;
-    }
-    m_pz = pz;
-    strcpy(m_name, "waveform for eeg");
-    makeMipmaps();
-  }
-#endif
-
   Feature(int /*iColormap*/, const std::string& filename, const std::string& dirname): m_fValid(false) {
     if (mb == mbUnknown) {
       mb = gpuMBavailable() > 0.0f ? mbPositive : mbZero;
@@ -685,7 +639,7 @@ public:
     const float mb0 = hasGraphicsRAM() ? gpuMBavailable() : 0.0f;
     // www.opengl.org/archives/resources/features/KilgardTechniques/oglpitfall/ #5 Not Setting All Mipmap Levels.
     for (unsigned level=0; (width/cchunk)>>level >= 1; ++level) {
-      //printf("  computing feature %d's mipmap level %d.\n", i, level);
+      //printf("  computing feature's mipmap level %d.\n", level);
       makeTextureMipmap(cacheHTK, level, width >> level);
     }
 
@@ -709,7 +663,7 @@ public:
     assert(width % cchunk == 0);
     width /= cchunk;
 
-    //printf("    computing %d mipmaps of width %d.\n", cchunk, width);
+    //if (mipmaplevel<3) printf("    Computing %d mipmaps of width %d.\n", cchunk, width);
     //printf("vectorsize %d\n", vectorsize());
     unsigned char* bufByte = new unsigned char[vectorsize()*width];
     for (int ichunk=0; ichunk<cchunk; ++ichunk) {
@@ -816,16 +770,20 @@ void shaderInit()
 // todo: in resize(), keep this a constant # of pixels, e.g.  yTimeline = 20 / pixelSize[1];
 const double yTimeline = 0.03;
 
+#undef WAVEDRAW
+#ifdef WAVEDRAW
 // Measured from top of timeline (y==0) to top of window (y==1).
 // Within the transformation that uses yTimeline.
 // (Could adapt to # of channels and # of features?  Or will interleaving replace this?)
 const double yBetweenWaveformAndFeatures = 0.2;
+#else
+const double yBetweenWaveformAndFeatures = 0.0;
+#endif
 
 void drawFeatures()
 {
-  if (features.empty()) {
+  if (features.empty())
     return;
-  }
 
   std::vector<Feature*>::const_iterator f;
 
@@ -835,7 +793,10 @@ void drawFeatures()
   int i=0;
   double sum = 0.0;
   for (f=features.begin(); f!=features.end(); ++f) {
-    sum += rgdy[i++] = sqrt(double((*f)->vectorsize()));
+    // Waveform-features have vectorsize = 50, so hope for about 50 vertical pixels.
+    // todo: adapt to pixelSize[1]
+    const double dy = !strcmp((*f)->name(), "waveform-as-feature") ? 1.5 : sqrt(double((*f)->vectorsize()));
+    sum += rgdy[i++] = dy;
     assert(i < 100); //hardcoded;;
   }
   // rgdy[0 .. i-1] are heights.
@@ -886,6 +847,8 @@ void drawFeatures()
 }
 
 unsigned int channels = 0; // == wavedrawers.size()
+
+#ifdef WAVEDRAW
 
 // Convert 0..32768 to what drawWaveformScaled() will scale the waveform by.  (bug: for actual pixels, consider yTimeline too? *=(1-yTimeline) ?)
 double scaleWavFromSampmax(const double s)
@@ -997,6 +960,7 @@ void drawWaveform()
     glPopMatrix();
   }
 }
+#endif
 
 double sMouseRuler = 0.0;
 void drawMouseRuler()
@@ -1209,8 +1173,10 @@ void aim()
   yShowPrev[0] = yShow[0];
   yShowPrev[1] = yShow[1];
 
+#ifdef WAVEDRAW
   // todo: in Windows, try PPL's parallel_for_each.  Good for an EEG's 90+ WaveDraw's.
   std::for_each(wavedrawers.begin(), wavedrawers.end(), std::mem_fun_ref(&WaveDraw::update));
+#endif
 }
 
 #if 0
@@ -1672,7 +1638,9 @@ void drawAll()
     // Draw in unit square.  x and y both from 0 to 1.
     drawFeatures();
     drawMouseRuler();
+#ifdef WAVEDRAW
     drawWaveform();
+#endif
     // debugYCoords();
   glPopMatrix();
 
@@ -1855,15 +1823,20 @@ int main(int argc, char** argv)
 
   // Clever fast memory-conserving shortcut for monophonic.
   short* channelS16 = channels==1 ? wavS16 : new short[wavcsamp];
+#ifdef WAVEDRAW
   const double msec_resolution = 0.3;
   const double undersample = std::max(1.0, msec_resolution * 1e-3 * SR);
+#endif
   for (unsigned i=0; i<channels; ++i) {
     if (channels != 1)
       for (long j=0; j<wavcsamp; ++j)
 	channelS16[j] = wavS16[channels*j+i];
+#ifdef WAVEDRAW
     wavedrawers.push_back(WaveDraw(new CHello(channelS16, wavcsamp, float(SR), int(undersample), 1)));
+#endif
   }
 
+  // todo: do this mixdown in timeliner_pre.cpp
   if (channels != 1) {
     // For now, just average all channels into monophonic audio playback.
     // todo: instead, a weighted sum that attenuates very weak channels.
@@ -1901,11 +1874,6 @@ int main(int argc, char** argv)
   glDisable(GL_LIGHTING);
 
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-#ifdef waveform_as_feature
-  // How make one of these per channel, in timeliner_pre?  That's an HTK feature, after all.;;;;
-  features.push_back(new Feature());
-  features.push_back(new Feature());
-#endif
 
   info("reading marshaled htk features");
   // Ugly and brute-force.  Just let filenames fail if they don't exist.
