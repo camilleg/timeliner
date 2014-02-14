@@ -698,10 +698,25 @@ void shaderUse(bool f)
 {
   glUseProgram(f ? myPrg : 0);
 }
-void shaderInit()
-{
-  glewInit();
-  assert(glewIsSupported("GL_VERSION_2_0"));
+
+GLfloat paletteBrightness = 1.0;
+void setPalette(const GLfloat r, const GLfloat g, const GLfloat b) {
+  static GLfloat bufPalette[3*128];
+  for (int i=0; i<128; ++i) {
+    const GLfloat z(paletteBrightness * sq(i/127.0f));
+    bufPalette[3*i+0] = z * r;
+    bufPalette[3*i+1] = z * g;
+    bufPalette[3*i+2] = z * b;
+  }
+  assert(      glGetUniformLocation(myPrg, "palette") >= 0);
+  glUniform1fv(glGetUniformLocation(myPrg, "palette"), 3*128, bufPalette);
+}
+
+void shaderRestart(const GLfloat r, const GLfloat g, const GLfloat b) {
+  // Recreating the shaders may be overkill for just redoing setPalette().
+  shaderUse(false);
+  if (myPrg != 0)
+    glDeleteProgram(myPrg);
   myPrg = glCreateProgram();
   assert(myPrg > 0);
   const GLuint myVS = glCreateShader(GL_VERTEX_SHADER);
@@ -717,15 +732,15 @@ void shaderInit()
   glShaderSource(myVS, 1, &prgV, NULL);
   glShaderSource(myFS, 1, &prgF, NULL);
 
-  int r = 0;
+  int ret = 0;
   //int cch=0, cch2=0; char sz[10000] = "";
 
-  glCompileShader(myVS); glGetShaderiv(myVS, GL_COMPILE_STATUS, &r); assert(r != GL_FALSE);
+  glCompileShader(myVS); glGetShaderiv(myVS, GL_COMPILE_STATUS, &ret); assert(ret != GL_FALSE);
   //glGetShaderiv(myFS, GL_INFO_LOG_LENGTH, &cch);
   //glGetShaderInfoLog(myFS, cch, &cch2, sz);
   //if (cch2>0) printf("vert compile: %s\n", sz);
 
-  glCompileShader(myFS); glGetShaderiv(myFS, GL_COMPILE_STATUS, &r); assert(r != GL_FALSE);
+  glCompileShader(myFS); glGetShaderiv(myFS, GL_COMPILE_STATUS, &ret); assert(ret != GL_FALSE);
   //cch = cch2 = 0;
   //glGetShaderiv(myFS, GL_INFO_LOG_LENGTH, &cch);
   //glGetShaderInfoLog(myFS, cch, &cch2, sz);
@@ -734,7 +749,7 @@ void shaderInit()
   glAttachShader(myPrg, myVS);
   glAttachShader(myPrg, myFS);
 
-  glLinkProgram(myPrg); glGetProgramiv(myPrg, GL_LINK_STATUS,   &r); assert(r != GL_FALSE);
+  glLinkProgram(myPrg); glGetProgramiv(myPrg, GL_LINK_STATUS,   &ret); assert(ret != GL_FALSE);
   //cch = cch2 = 0;
   //glGetProgramiv(myPrg, GL_INFO_LOG_LENGTH, &cch);
   //glGetProgramInfoLog(myPrg, cch, &cch2, sz);
@@ -746,23 +761,20 @@ void shaderInit()
   // Alternatives: UBO; texelFetch() a buffer texture (TBO), SSBO.
   // http://stackoverflow.com/questions/7954927/glsl-passing-a-list-of-values-to-fragment-shader
   // http://rastergrid.com/blog/2010/01/uniform-buffers-vs-texture-buffers/
-  GLfloat bufPalette[3*128];
-  for (int i=0; i<128; ++i) {
-    const float z = float(sq(i/127.0f));
-    // rgb, // a
-    bufPalette[3*i+0] = z * 0.9f;
-    bufPalette[3*i+1] = z * 1.0f;
-    bufPalette[3*i+2] = z * 0.4f;
-//  bufPalette[4*i+3] = 1.0;
-  }
 
   shaderUse(true); // before calling any glUniform()s, so they know which program to refer to.
-  assert(      glGetUniformLocation(myPrg, "palette") >= 0);
-  glUniform1fv(glGetUniformLocation(myPrg, "palette"), 3*128, bufPalette);
+  setPalette(r,g,b);
 
   glActiveTexture(GL_TEXTURE0); // use texture unit 0
   assert(     glGetUniformLocation(myPrg, "heatmap") >= 0);
   glUniform1i(glGetUniformLocation(myPrg, "heatmap"), 0); // Bind sampler to texture unit 0.  www.opengl.org/wiki/Texture#Texture_image_units
+}
+
+void shaderInit()
+{
+  glewInit();
+  assert(glewIsSupported("GL_VERSION_2_0"));
+  shaderRestart(0.9, 1.0, 0.4);
 }
 
 // Top of timeline, measured from bottom of window (y==0) to top of window (y==1).
@@ -1341,8 +1353,8 @@ void keyboard(const unsigned char key, const int x, int /*y*/)
   const double panspeed = 0.25;
 
   switch(key) {
-    case 3: // ctrl+C
-    case 23: // ctrl+W
+    case 'c'-'a'+1: // ctrl+C
+    case 'w'-'a'+1: // ctrl+W
       vfQuit = true;
       snooze(0.4); // let other threads notice vfQuit
       exit(0);
@@ -1379,6 +1391,19 @@ void keyboard(const unsigned char key, const int x, int /*y*/)
     case 's':
       scrollwheel(xFromMouse(x), false, true);
       break;
+
+    case 'b':
+      paletteBrightness *= 1.03;
+      goto LReshade;
+    case 'B':
+      paletteBrightness /= 1.03;
+      goto LReshade;
+    case 'b'-'a'+1: // ctrl+B
+      paletteBrightness = 1.0;
+LReshade:
+      shaderRestart(0.9, 1.0, 0.4);
+      break;
+
     default:
       warnIgnoreKeystroke(key);
       break;
