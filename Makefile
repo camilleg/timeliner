@@ -26,12 +26,20 @@ timeliner_run: $(OBJS_RUN)
 timeliner_prp: $(OBJS_PRE)
 	g++ $(CFLAGS) -o $@ $(OBJS_PRE) $(LIBS_PRE)
 
-test-EEG: timeliner_run Makefile example/EEG/marshal/mixed.wav
+# Testcases don't depend on e.g. example/mono/marshal/mixed.wav,
+# because that's a symlink with an irrelevant timestamp.
+
+test-EEG: timeliner_run Makefile
 	export ALSA_CARD=0 && ./timeliner_run example/EEG/marshal
 example/EEG/marshal/mixed.wav: timeliner_prp /r/timeliner/testcases/eeg/eeg.rec example/EEG/config.txt
 	cd example && ../timeliner_prp EEG/marshal EEG/config.txt
 
-test-stereo: timeliner_run Makefile example/stereo/marshal/mixed.wav
+test-stereo: timeliner_run Makefile
 	export ALSA_CARD=0 && ./timeliner_run example/stereo/marshal
 example/stereo/marshal/mixed.wav: timeliner_prp example/stereo/choral-stereo.wav example/stereo/config.txt
 	cd example && ../timeliner_prp stereo/marshal stereo/config.txt
+
+test-mono: timeliner_run Makefile
+	export ALSA_CARD=0 && ./timeliner_run example/mono/marshal
+example/mono/marshal/mixed.wav: timeliner_prp example/mono/choral.wav example/mono/config.txt
+	cd example && ../timeliner_prp mono/marshal mono/config.txt
