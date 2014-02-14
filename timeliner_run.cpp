@@ -436,7 +436,7 @@ int pixelSize[2] = {1000,1000};
 double dxChar = 0.01;
 #define font GLUT_BITMAP_9_BY_15
 
-double sq(double _) { return _*_; }
+template <class T> T sq(const T _) { return _*_; }
 
 // As z from 0 to 1, lerp from min to max.
 double geometriclerp(double z, double min, double max)
@@ -774,7 +774,7 @@ void shaderInit()
 {
   glewInit();
   assert(glewIsSupported("GL_VERSION_2_0"));
-  shaderRestart(0.9, 1.0, 0.4);
+  shaderRestart(0.9f, 1.0f, 0.4f);
 }
 
 // Top of timeline, measured from bottom of window (y==0) to top of window (y==1).
@@ -1393,15 +1393,15 @@ void keyboard(const unsigned char key, const int x, int /*y*/)
       break;
 
     case 'b':
-      paletteBrightness *= 1.03;
+      paletteBrightness *= 1.03f;
       goto LReshade;
     case 'B':
-      paletteBrightness /= 1.03;
+      paletteBrightness /= 1.03f;
       goto LReshade;
     case 'b'-'a'+1: // ctrl+B
-      paletteBrightness = 1.0;
+      paletteBrightness = 1.0f;
 LReshade:
-      shaderRestart(0.9, 1.0, 0.4);
+      shaderRestart(0.9f, 1.0f, 0.4f);
       break;
 
     default:

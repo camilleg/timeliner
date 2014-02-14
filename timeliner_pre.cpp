@@ -393,7 +393,7 @@ public:
       const int sWavMax = clamp(0, int(round(wavMax*m_vectorsize)), m_vectorsize-1);
 
       float* pz = m_data+t*m_vectorsize;
-      std::fill(pz+sWavMin, pz+sWavMax+1, 1.0);
+      std::fill(pz+sWavMin, pz+sWavMax+1, 1.0f);
     }
 
   }
