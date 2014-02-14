@@ -527,15 +527,6 @@ class Feature {
     GLuint tex[vecLim];
   };
 
-  double testpattern(const int t) const { // return 0.0 to 1.0
-    return sin(t / 6.28 / 7) * 0.5 + 0.5;
-  //return (t%30)/30.0;
-  }
-
-  template <class T> const T& min3(const T& a, const T& b, const T& c) { return std::min(a, std::min(b, c)); }
-  template <class T> const T& max3(const T& a, const T& b, const T& c) { return std::max(a, std::max(b, c)); }
-  template <class T> const T avg(const T& a, const T& b) { return (a+b)*0.5; }
-
 public:
   int cchunk;
   std::vector<Slartibartfast> rgTex;
