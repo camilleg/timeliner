@@ -4,10 +4,24 @@
 
 #undef DEBUG
 
+// Linux:   apt-get install libsndfile1-dev
+// Windows: www.mega-nerd.com/libsndfile/ libsndfile-1.0.25-w64-setup.exe
+#include <sndfile.h>
+#include <vector>
+
+// Linux:   apt-get install libglew-dev
+// Windows: http://glew.sourceforge.net/install.html
+#include <GL/glew.h> // before gl.h
+#include <GL/glut.h>
+
 #include "timeliner_diagnostics.h"
+#include "timeliner_cache.h"
+#include "timeliner_util.h" // #includes <windows.h>
+
+// apt-get install libpng12-dev
+#include <png.h>
 
 #include <algorithm>
-#include <cassert>
 #include <cerrno>
 #include <cmath>
 #include <cstdio>
@@ -16,8 +30,6 @@
 #include <fstream>
 
 #ifdef _MSC_VER
-#define NOMINMAX // Don't #define min and max in windows.h, so std::min works.
-#include <windows.h>
 #include <time.h>
 #include <iostream>
 #include <sstream>
@@ -31,28 +43,16 @@
 #include <unistd.h>
 #endif
 
-// Linux:   apt-get install libsndfile1-dev
-// Windows: www.mega-nerd.com/libsndfile/ libsndfile-1.0.25-w64-setup.exe
-#include <sndfile.h>
-#include <vector>
-
-// Linux:   apt-get install libglew-dev
-// Windows: http://glew.sourceforge.net/install.html
-#include <GL/glew.h> // before gl.h
-#include <GL/glut.h>
-
 #if !defined(GLUT_WHEEL_UP)
 #define GLUT_WHEEL_UP   (3)
 #define GLUT_WHEEL_DOWN (4)
 #endif
 
-#include "timeliner_cache.h"
-#include "timeliner_util.h"
-
+void snooze(const double sec)
 #ifdef _MSC_VER
-void snooze(double sec) { Sleep(DWORD(sec * 1e3)); }
+{ Sleep(DWORD(sec * 1e3)); }
 #else
-void snooze(double sec) { (void)usleep(sec * 1e6); }
+{ (void)usleep(sec * 1e6); }
 #endif
 
 #ifdef _MSC_VER
@@ -1615,6 +1615,48 @@ void drawThumb()
   glEnd();
 }
 
+// Save a screenshot as a .png file.
+bool screenshot(const char* filename)
+{
+  FILE* fp = fopen(filename, "wb");
+  if (!fp)
+    return false;
+  const int width = pixelSize[0];
+  const int height = pixelSize[1];
+
+  // Read pixels.  With libpng, RGBA works better than RGB.
+  unsigned char* pRGB = new unsigned char[width * height * 4];
+  glReadPixels(0,0, width,height,  GL_RGBA,  GL_UNSIGNED_BYTE, pRGB);
+
+  // todo: more error checking like http://zarb.org/~gc/html/libpng.html.
+  png_structp pPNG = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+  png_init_io(pPNG, fp);
+  png_infop pInfoPNG = png_create_info_struct(pPNG);
+  png_set_IHDR(pPNG, pInfoPNG, width,height, 8, PNG_COLOR_TYPE_RGBA,
+    PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+  png_write_info(pPNG, pInfoPNG);
+
+  // Copy pixels from pRGB to PNG.
+  png_byte** ppRowPNG = new png_byte* [height];
+  for (int y=0; y<height; ++y) {
+    ppRowPNG[y] = new png_byte[png_get_rowbytes(pPNG, pInfoPNG)];
+    for (int x=0; x<width; ++x) {
+      const unsigned char* pbSrc = pRGB + 4*((height-1-y)*width + x);
+      std::copy(pbSrc, pbSrc+4, &ppRowPNG[y][x*4]);
+    }
+  }
+  png_write_image(pPNG, ppRowPNG);
+  png_write_end(pPNG, NULL);
+
+  for (int y=0; y<height; ++y)
+    delete [] ppRowPNG[y];
+  delete [] ppRowPNG;
+  png_destroy_write_struct(&pPNG, &pInfoPNG);
+  fclose(fp);
+  delete [] pRGB;
+  return true;
+}
+
 void drawAll()
 {
   if (!fReshaped) {
@@ -1672,6 +1714,7 @@ void drawAll()
   flashLimits[0].draw();
   flashLimits[1].draw();
   drawCursors();
+
   glutSwapBuffers();
   aim();
 }

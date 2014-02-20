@@ -11,7 +11,7 @@ OBJS_RUN = $(OBJS) timeliner_run.o alsa.o
 OBJS_ALL = $(OBJS_RUN) $(OBJS_PRE)
 
 LIBS_PRE = -lsndfile -lgsl -lblas 
-LIBS_RUN = -lasound -lglut -lGLU -lGL -lGLEW -L/usr/X11R6/lib -lXmu -lXi -lXext -lX11 -lsndfile -lpthread -lrt
+LIBS_RUN = -lasound -lglut -lGLU -lGL -lGLEW -L/usr/X11R6/lib -lXmu -lXi -lXext -lX11 -lsndfile -lpng -lpthread -lrt
 
 all: test-mono
 
