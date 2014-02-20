@@ -3,6 +3,9 @@
 #endif
 
 #undef DEBUG
+#include "timeliner_diagnostics.h"
+#include "timeliner_cache.h"
+#include "timeliner_util.h" // #includes <windows.h>
 
 // Linux:   apt-get install libsndfile1-dev
 // Windows: www.mega-nerd.com/libsndfile/ libsndfile-1.0.25-w64-setup.exe
@@ -14,11 +17,8 @@
 #include <GL/glew.h> // before gl.h
 #include <GL/glut.h>
 
-#include "timeliner_diagnostics.h"
-#include "timeliner_cache.h"
-#include "timeliner_util.h" // #includes <windows.h>
-
-// apt-get install libpng12-dev
+// Linux: apt-get install libpng12-dev
+// Windows: http://gnuwin32.sourceforge.net/packages/libpng.htm and http://zlib.net/
 #include <png.h>
 
 #include <algorithm>
@@ -56,7 +56,6 @@ void snooze(const double sec)
 #endif
 
 #ifdef _MSC_VER
-#include <windows.h>
 #include <time.h>
 #include <iostream>
  
