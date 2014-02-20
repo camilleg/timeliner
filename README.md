@@ -5,11 +5,11 @@ A browser for long audio recordings.
 ### How to build and run Timeliner on Ubuntu 10.04 or 12.04
 
 `sudo apt-get install g++ freeglut3-dev gsl-bin libgsl0-dev libglm-dev libsndfile1-dev \`
-`libxi-dev libxmu-dev libasound2-dev audiofile-tools`
+`libxi-dev libxmu-dev libasound2-dev audiofile-tools libglew-dev libpng12-dev`
 
 Install [HTK 3.4.1](http://htk.eng.cam.ac.uk).
 (To handle files larger than 2 GB on 64-bit Linux:
-after running HTK's `./configure`, but before running `make`:
+after running HTK's `./configure`, but before running `make`,
 in all of HTK's subdiectories' Makefiles, remove `-m32` from the `CFLAGS` definitions.)
 
 Optionally install [QuickNet](http://www.icsi.berkeley.edu/Speech/qn.html).
@@ -37,11 +37,14 @@ Install [HTK 3.4.1](http://htk.eng.cam.ac.uk).  Corrected instructions:
 - Either add to your PATH the folder `bin.win32`, wherever you'd put that,
 or copy `bin.win32/HCopy.exe` to some folder on your PATH.
 
+Install [libpng](http://gnuwin32.sourceforge.net/packages/libpng.htm).
+
+Install [zlib](http://zlib.net/).
+
 Start Visual Studio.  Open timeliner\timeliner.sln.
 Within that solution, in each project, rightclick Properties;
 *   For Configuration, choose All Configurations.
-    *   In VC++ Directories, adjust the Include Directory and Library Directory to where you installed freeglut and GLM.
-    *   In VC++ Directories, add the Include Directory and Library Directory to where you installed libsndfile.  
+    *   In VC++ Directories, add the Include Directory and Library Directory to where you installed libsndfile, freeglut, GLM, libpng, and zlib.
             (This is smarter than copying `*.lib` and `*.h` into the Timeliner project.)  
             (Beware the different directories `Program Files` and `Program Files (x86)`.)
     *   In Debugging, for Command Arguments specify:
@@ -58,7 +61,7 @@ Run the projects `timeliner_pre` and `timeliner` (hit Ctrl+F5).
 
 ### How to adjust Timeliner
 
-Read Camille's paper [Effective Browsing of Long Audio Recordings](http://zx81.isl.uiuc.edu/camilleg/acmmm12.pdf).
+Read the paper [Effective Browsing of Long Audio Recordings](http://zx81.isl.uiuc.edu/camilleg/acmmm12.pdf).
 
 The maximum width of a vector of values in a node of the agglomerative cache
 is the compile-time constant `CQuartet_widthMax` in `timeliner_cache.h`.
