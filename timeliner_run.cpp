@@ -17,7 +17,7 @@
 #include <GL/glew.h> // before gl.h
 #include <GL/glut.h>
 
-// Linux: apt-get install libpng12-dev
+// Linux:   apt-get install libpng12-dev
 // Windows: http://gnuwin32.sourceforge.net/packages/libpng.htm and http://zlib.net/
 #include <png.h>
 
@@ -37,6 +37,7 @@
 #else
 #include <pthread.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h> // mkdir
 #include <sys/time.h>
 #include <sys/types.h>
 #include <linux/soundcard.h>
@@ -46,6 +47,19 @@
 #if !defined(GLUT_WHEEL_UP)
 #define GLUT_WHEEL_UP   (3)
 #define GLUT_WHEEL_DOWN (4)
+#endif
+
+#undef making_movie
+#ifdef making_movie
+double sMovieRecordingStart = -1.0;
+bool fMovieRecording = false;
+bool fMoviePlaying = false;
+const int izPlaybackMaxMax = 30 * 60; // 30 FPS, max 60 seconds
+double rgzPlayback[izPlaybackMaxMax][5];
+int izPlaybackMax = 0; // last frame
+int izPlayback = 0; // current frame, at 30 FPS
+FILE* fpMovie = NULL;
+#define yscroll_disable
 #endif
 
 void snooze(const double sec)
@@ -343,7 +357,11 @@ public:
   }
   bool xPlayCursors(double* dst) const {
     arGuard _(_lock);
-    if (!_fPlaying)
+    if (!_fPlaying
+#ifdef making_movie
+	&& !fMoviePlaying
+#endif
+	)
       return false;
     dst[0] = glFromSecond(_sPlay);
     dst[1] = glFromSecond(sPlayCursor1Nolock());
@@ -393,12 +411,27 @@ public:
       // or the user's explicit repositioning of purple cursor (that's better).
       if (f && s==_sPlayPrev) {
 	_fPlaying = false;
+#ifdef making_movie
+	if (fMovieRecording)
+	  fprintf(fpMovie, "# audio playback stop at offset = %f s\n", sPlayCursor1Nolock());
+#endif
       } else {
 	_sPlayPrev = s;
 	soundplayNolock(s);
+#ifdef making_movie
+	if (fMovieRecording)
+	  fprintf(fpMovie, "# audio playback start from wavfile offset = %f s, at screenshot-recording offset = %f s\n", s, appnow() - sMovieRecordingStart);
+#endif
       }
     }
   }
+
+#ifdef making_movie
+  void moviePlayback(const double s, const double t) {
+    _sPlay = s;
+    _tPlay = s + appnow() - t; // inverse of sPlayCursor1Nolock()
+  }
+#endif
 
 private:
   // Start playing at offset of t seconds,
@@ -1074,6 +1107,7 @@ double xyMouse[2] = {0.5, 0.15};	// Mouse position in GL coords.
 double xMouseAim = 0.0, yMouseAim = 0.0;// Mouse position in world coords.  Setpoint for xyMouse.
 bool fReshaped = false;
 
+// Update tShow and yShow from tAim and yAim, from xyMouse.
 void aim()
 {
   if (!fReshaped)
@@ -1194,6 +1228,7 @@ void debugYCoords()
 
 void scrollwheelY(double y, const bool fIn)
 {
+#ifndef yscroll_disable
   // Undo yTimeline transformation: map 0..1 to yTimeline..1.
   y = (y - yTimeline) / (1.0-yTimeline);
   const double yFixed = yFromGL(y);
@@ -1204,6 +1239,7 @@ void scrollwheelY(double y, const bool fIn)
   const double zoom = fIn ? 1.0/1.08 : 1.08; // Smaller than for x aka t, because range is also smaller.
   yAim[0] = yFixed + (yAim[0]-yFixed) * zoom;
   yAim[1] = yFixed + (yAim[1]-yFixed) * zoom;
+#endif
 }
 
 // later, increase step for successive steps in same direction, resetting this after 0.5 seconds elapse.
@@ -1332,6 +1368,13 @@ void warnIgnoreKeystroke(const unsigned char key)
   printf("\n");
 }
 
+void appQuit()
+{
+  vfQuit = true;
+  snooze(0.4); // let other threads notice vfQuit
+  exit(0);
+}
+
 void keyboard(const unsigned char key, const int x, int /*y*/)
 {
   if (!fReshaped)
@@ -1345,9 +1388,7 @@ void keyboard(const unsigned char key, const int x, int /*y*/)
   switch(key) {
     case 'c'-'a'+1: // ctrl+C
     case 'w'-'a'+1: // ctrl+W
-      vfQuit = true;
-      snooze(0.4); // let other threads notice vfQuit
-      exit(0);
+      appQuit();
     case ' ':
       // Snap offscreen cursor back onscreen,
       // because subjects twitch-game rather than constructing deep subplans.
@@ -1394,6 +1435,28 @@ LReshade:
       shaderRestart(0.9f, 1.0f, 0.4f);
       break;
 
+#ifdef making_movie
+    case 'p':
+      fMoviePlaying = true;
+      info("playing movie: ensure window is entirely visible"); // glReadPixels() returns noise for offscreen or cropped pixels
+      break;
+    case 'P':
+      fMoviePlaying = false;
+      info("aborted playing movie");
+      izPlayback = 0;
+      izPlaybackMax = 0;
+      break;
+    case 'r':
+      fMovieRecording = true;
+      sMovieRecordingStart = appnow();
+      info("recording movie");
+      break;
+    case 'R':
+      fMovieRecording = false;
+      info("recorded movie");
+      break;
+#endif
+
     default:
       warnIgnoreKeystroke(key);
       break;
@@ -1416,12 +1479,14 @@ void drag(const int x, const int y)
     tAim[1] += dsec;
     xyPanPrev[0] = xpan;
 
+#ifndef yscroll_disable
     yMouseAim = yFromMouse(y);
     const double ypan = yMouseAim;
     const double dy = dyFromGL(xyPanPrev[1] - ypan);
     yAim[0] += dy;
     yAim[1] += dy;
     xyPanPrev[1] = ypan;
+#endif
 
     fDrag |= !vfFakeDrag; // distinguish left click from left drag
   }
@@ -1560,8 +1625,12 @@ void drawTicks()
   }
 }
 
-void reshape(const int w, const int h)
+void reshape(int w, int h)
 {
+#ifdef making_movie
+  w = 1280;
+  h = 720;
+#endif
   glViewport(0, 0, pixelSize[0]=w, pixelSize[1]=h);
   // Assume monospace.
   dxChar = glutBitmapWidth(font, 'a') / double(pixelSize[0]);
@@ -1614,7 +1683,8 @@ void drawThumb()
   glEnd();
 }
 
-// Save a screenshot as a .png file.
+// Save a screenshot (excluding the mouse cursor) as a .png file.
+// From http://zarb.org/~gc/html/libpng.html.
 bool screenshot(const char* filename)
 {
   FILE* fp = fopen(filename, "wb");
@@ -1627,10 +1697,17 @@ bool screenshot(const char* filename)
   unsigned char* pRGB = new unsigned char[width * height * 4];
   glReadPixels(0,0, width,height,  GL_RGBA,  GL_UNSIGNED_BYTE, pRGB);
 
-  // todo: more error checking like http://zarb.org/~gc/html/libpng.html.
   png_structp pPNG = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-  png_init_io(pPNG, fp);
+  if (!pPNG) {
+    warn("screenshot problem 1");
+    return false;
+  }
   png_infop pInfoPNG = png_create_info_struct(pPNG);
+  if (!pInfoPNG) {
+    warn("screenshot problem 2");
+    return false;
+  }
+  png_init_io(pPNG, fp);
   png_set_IHDR(pPNG, pInfoPNG, width,height, 8, PNG_COLOR_TYPE_RGBA,
     PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
   png_write_info(pPNG, pInfoPNG);
@@ -1656,12 +1733,94 @@ bool screenshot(const char* filename)
   return true;
 }
 
+#ifdef making_movie
+
+void movieRecord()
+{
+  static double tRecordStart = -1.0;
+  static int iFrame = 0;
+  if (tRecordStart < 0.0) {
+    tRecordStart = appnow();
+    fpMovie = fopen("timeliner-recording.txt", "w");
+  }
+  // 30 FPS for video
+  const double t = tRecordStart + iFrame/30.0;
+  if (appnow() >= t) {
+    double rgs[2] = {-1.0,-1.0};
+    (void)s2s.sPlayCursors(rgs);
+    fprintf(fpMovie, "%f %f %f %f %f\n", tShow[0], tShow[1], sMouseRuler/*purple*/, rgs[0],rgs[1]/*green*/);
+    ++iFrame;
+  }
+}
+
+const char* movieDir = "/run/shm/timeliner/";
+void moviePlayback()
+{
+  if (izPlaybackMax == 0) {
+    if (0 != access(movieDir, F_OK)) {
+      switch (errno) {
+      case ENOENT:
+	if (mkdir(movieDir, 0644) != 0)
+	  // fallthrough
+      case ENOTDIR:
+	  quit("failed to store screenshots");
+	break;
+      }
+      // movieDir exists.
+    }
+    (void)system("/bin/rm -f /run/shm/timeliner/*.png");
+    // Removing either the nonempty dir or the wildcard *.png, without system(),
+    // is necessarily elaborate: http://stackoverflow.com/questions/1149764/delete-folder-with-items
+
+    // Parse timeliner-recording.txt into an array of floats.
+    FILE* fp = fopen("timeliner-recording.txt", "r");
+    while (fp && izPlaybackMax < izPlaybackMaxMax) {
+      char line[200];
+      if (1 != fscanf(fp, "%[^\n]\n", line))
+	break;
+      if (line[0] == '#')
+	continue;		// comment, e.g. seconds-offset of audio playback
+      double* pz = rgzPlayback[izPlaybackMax++];
+      if (5 != sscanf(line, "%lf %lf %lf %lf %lf", pz, pz+1, pz+2, pz+3, pz+4))
+	break;
+    }
+    fclose(fp);
+    printf("Parsed %d playback frames = %.1f seconds.\n", izPlaybackMax-1, (izPlaybackMax-1)/30.0);
+  }
+  if (!vfQuit) {
+    const double* pz = rgzPlayback[izPlayback];
+    tShow[0] = pz[0];
+    tShow[1] = pz[1];
+    sMouseRuler = pz[2];
+    s2s.moviePlayback(pz[3], pz[4]);
+    //Cursors
+    if (++izPlayback >= izPlaybackMax) {
+      printf("Playback complete.\n");
+      appQuit();
+    }
+  }
+}
+
+void movieSaveFrame()
+{
+  char filename[80];
+  sprintf(filename, "%s%05d.png", movieDir, izPlayback);
+  screenshot(filename);
+  // Afterwards: cd /run/shm/timeliner; ffmpeg -y -i %05d.png -c:v h264 timeliner.mov
+}
+#endif
+
 void drawAll()
 {
   if (!fReshaped) {
     // Still starting up.  Window manager hasn't set the window size yet.
     return;
   }
+
+#ifdef making_movie
+  if (fMoviePlaying)
+    moviePlayback();
+#endif
 
   const double t = appnow();
   const double dt = t - tFPSPrev;
@@ -1713,6 +1872,13 @@ void drawAll()
   flashLimits[0].draw();
   flashLimits[1].draw();
   drawCursors();
+
+#ifdef making_movie
+  if (fMovieRecording)
+    movieRecord();
+  if (fMoviePlaying)
+    movieSaveFrame();
+#endif
 
   glutSwapBuffers();
   aim();
