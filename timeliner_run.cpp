@@ -716,31 +716,38 @@ private:
 int Feature::mb = mbUnknown;
 std::vector<Feature*> features;
 
-GLuint myPrg = 0;
-void shaderUse(bool f)
+std::vector<GLuint> myPrgs;
+bool fShaderValid(const int i)
 {
-  glUseProgram(f ? myPrg : 0);
+  return 0<=i && i<int(myPrgs.size()) && myPrgs[i]!=0;
+}
+void shaderUse(const int i = -1)
+{
+  glUseProgram(fShaderValid(i) ? myPrgs[i] : 0);
 }
 
 GLfloat paletteBrightness = 1.0;
-void setPalette(const GLfloat r, const GLfloat g, const GLfloat b) {
-  static GLfloat bufPalette[3*128];
+void setPalette(const int iShader, const GLfloat r, const GLfloat g, const GLfloat b) {
+  static GLfloat bufPalette[3*128]; // One bufPalette is enough for multiple shaders.
   for (int i=0; i<128; ++i) {
     const GLfloat z(paletteBrightness * sq(i/127.0f));
     bufPalette[3*i+0] = z * r;
     bufPalette[3*i+1] = z * g;
     bufPalette[3*i+2] = z * b;
   }
-  assert(      glGetUniformLocation(myPrg, "palette") >= 0);
-  glUniform1fv(glGetUniformLocation(myPrg, "palette"), 3*128, bufPalette);
+  assert(fShaderValid(iShader));
+  assert(      glGetUniformLocation(myPrgs[iShader], "palette") >= 0);
+  glUniform1fv(glGetUniformLocation(myPrgs[iShader], "palette"), 3*128, bufPalette);
 }
 
-void shaderRestart(const GLfloat r, const GLfloat g, const GLfloat b) {
+void shaderRestart(const int iShader, const double r, const double g, const double b) {
   // Recreating the shaders may be overkill for just redoing setPalette().
-  shaderUse(false);
-  if (myPrg != 0)
-    glDeleteProgram(myPrg);
-  myPrg = glCreateProgram();
+  shaderUse();
+  if (fShaderValid(iShader))
+    glDeleteProgram(myPrgs[iShader]);
+  if (int(myPrgs.size()) < iShader+1) myPrgs.resize(iShader+1, -1);
+  myPrgs[iShader] = glCreateProgram();
+  const GLuint& myPrg = myPrgs[iShader];
   assert(myPrg > 0);
   const GLuint myVS = glCreateShader(GL_VERTEX_SHADER);
   const GLuint myFS = glCreateShader(GL_FRAGMENT_SHADER);
@@ -785,19 +792,25 @@ void shaderRestart(const GLfloat r, const GLfloat g, const GLfloat b) {
   // http://stackoverflow.com/questions/7954927/glsl-passing-a-list-of-values-to-fragment-shader
   // http://rastergrid.com/blog/2010/01/uniform-buffers-vs-texture-buffers/
 
-  shaderUse(true); // before calling any glUniform()s, so they know which program to refer to.
-  setPalette(r,g,b);
+  shaderUse(iShader); // before calling any glUniform()s, so they know which program to refer to.
+  setPalette(iShader, GLfloat(r),GLfloat(g),GLfloat(b));
 
   glActiveTexture(GL_TEXTURE0); // use texture unit 0
   assert(     glGetUniformLocation(myPrg, "heatmap") >= 0);
   glUniform1i(glGetUniformLocation(myPrg, "heatmap"), 0); // Bind sampler to texture unit 0.  www.opengl.org/wiki/Texture#Texture_image_units
 }
 
+void kickShaders()
+{
+  for (unsigned i=0; i<features.size(); ++i)
+    shaderRestart(i, 0.9-0.1*i, 1.0, 0.4+0.1*i);
+}
+
 void shaderInit()
 {
   glewInit();
   assert(glewIsSupported("GL_VERSION_2_0"));
-  shaderRestart(0.9f, 1.0f, 0.4f);
+  kickShaders();
 }
 
 // Top of timeline, measured from bottom of window (y==0) to top of window (y==1).
@@ -843,9 +856,9 @@ void drawFeatures()
       rgy[j] = rgy[j-1] + rgdy[j-1] / rescale;
     // rgy [0 .. i] are boundaries between features.
   }
-  shaderUse(true);
 
   for (f=features.begin(),i=0; f!=features.end(); ++f,++i) {
+    shaderUse(i);
     const double* p = rgy + i;
       glDisable(GL_TEXTURE_2D);
       glEnable(GL_TEXTURE_1D);
@@ -941,7 +954,7 @@ void drawWaveformScaled(const float* minmaxes, const double yScale) {
 
 void drawWaveform()
 {
-  shaderUse(false);
+  shaderUse();
   // 0 < x < 1
   // y above timeline, and rescale audio values from +-32768.
 
@@ -999,7 +1012,7 @@ void drawWaveform()
 double sMouseRuler = 0.0;
 void drawMouseRuler()
 {
-  shaderUse(false);
+  shaderUse();
   const double xL = glFromSecond(sMouseRuler);
   const double xR = xL + 0.06;
   if (xR < 0.0 || xL > 1.0)
@@ -1030,7 +1043,7 @@ public:
     _color[3]                  = 1.0;
   };
   void draw() {
-    shaderUse(false);
+    shaderUse();
     if (_color[3] <= 0.0)
       return;			// faded away
     _color[3] -= float(_fadeStep);	// fade
@@ -1312,7 +1325,7 @@ void drawTimeline()
   }
 
   // Draw.
-  shaderUse(false);
+  shaderUse();
   glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, texNoise);
     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
@@ -1432,7 +1445,7 @@ void keyboard(const unsigned char key, const int x, int /*y*/)
     case 'b'-'a'+1: // ctrl+B
       paletteBrightness = 1.0f;
 LReshade:
-      shaderRestart(0.9f, 1.0f, 0.4f);
+      kickShaders();
       break;
 
 #ifdef making_movie
@@ -1594,7 +1607,7 @@ void drawTicks()
 
   const double dxMin = 3.0/65.0;
   tickreset();
-  shaderUse(false);
+  shaderUse();
   for (int i=0; i<cUnit; ++i) {
     const char* label = szTick[i];
     const double scale = secTick[i];
@@ -1661,7 +1674,7 @@ void drawThumb()
   assert(0.0 <= x0);
   assert(x0 <= x1);
   assert(x1 <= 1.0);
-  shaderUse(false);
+  shaderUse();
 
   // fade out top edge, so thumb doesn't look manipulable.
   glBegin(GL_QUADS);
