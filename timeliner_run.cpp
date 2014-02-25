@@ -49,7 +49,7 @@
 #define GLUT_WHEEL_DOWN (4)
 #endif
 
-#undef making_movie
+#define making_movie
 #ifdef making_movie
 double sMovieRecordingStart = -1.0;
 bool fMovieRecording = false;
@@ -1766,10 +1766,16 @@ void movieRecord()
   }
 }
 
-const char* movieDir = "/run/shm/timeliner/";
+const char* movieDir =
+#ifdef _MSC_VER
+  ".";
+#else
+  "/run/shm/timeliner/";
+#endif
 void moviePlayback()
 {
   if (izPlaybackMax == 0) {
+#ifndef _MSC_VER
     if (0 != access(movieDir, F_OK)) {
       switch (errno) {
       case ENOENT:
@@ -1784,7 +1790,7 @@ void moviePlayback()
     (void)system("/bin/rm -f /run/shm/timeliner/*.png");
     // Removing either the nonempty dir or the wildcard *.png, without system(),
     // is necessarily elaborate: http://stackoverflow.com/questions/1149764/delete-folder-with-items
-
+#endif
     // Parse timeliner-recording.txt into an array of floats.
     FILE* fp = fopen("timeliner-recording.txt", "r");
     while (fp && izPlaybackMax < izPlaybackMaxMax) {
