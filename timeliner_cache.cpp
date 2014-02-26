@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cmath>
+#include <limits>
 
 #include "timeliner_cache.h"
 
@@ -754,7 +755,7 @@ void CHello::getbatch(float* r, const double t0, const double t1, const unsigned
 }
 
 // Convert rgb triple in-place to hsv.
-static inline void RgbFromHsv(Float* a)
+void RgbFromHsv(Float* a)
 {
   const Float v = a[2];
   const Float s = a[1];
@@ -863,41 +864,86 @@ static Float ByteFromMMM(const Float* a, int iColormap)
   switch (iColormap) {
     case 5: // waveform for shader
       return a[2]; // lerp(0.99f, a[2], a[1]);
-      break;
     case 4: // oracle
       return a[2]; // max
-      break;
     case 3: // wavelet
       // max, and somewhat mean
       return lerp(0.8f, a[2], a[1]);
     case 0: // feaFB filterbank
       // max, and somewhat mean
-      return lerp(0.6f, a[2], a[1]);
+      return lerp(0.7f, a[2], a[1]);
     case 1: // feaMFCC
       // max, and somewhat mean
       return lerp(0.6f, a[2], sq(a[1]));
     default: // Saliency
       return a[2];
-      break;
   }
 }
 
 // Return conflated min mean max as a byte, jMax copies concatenated.
 void CHello::getbatchByte(unsigned char* r, const double t0, const double t1, const int jMax, const unsigned cstep, const int iColormap) const
 {
+#undef adaptive_brightness
+#ifdef adaptive_brightness
+  const Float m = std::numeric_limits<Float>::max();
+  Float mmmMinMax[6] = { m,-m, m,-m, m,-m };
+  Float* rgMMM = new Float[cstep * jMax * 3];
+#endif
+
   const CQuartet* dummyCur = CQuartet::dummy(width);
   double t = t0;
-  const double dt = (t1-t0) / double(cstep);
+  const double dt = (t1-t0) / cstep;
+
   for (unsigned i=0; i<cstep; ++i,t+=dt) {
     const Float tMin = Float(t - 0.5 * dt);
     const Float tLim = Float(t + 0.5 * dt);
     const CQuartet q(recurse(layers, tMin, tLim, layers->size() - 1, 0));
     const CQuartet& rq = q ? q : *dummyCur;
     for (int j=0; j<jMax; ++j) {
+#ifndef adaptive_brightness
       const Float yMMM[3] = {rq[3*j+1], rq[3*j+2], rq[3*j+3]};
       r[(j*cstep+i)] = (unsigned char)( ByteFromMMM(yMMM, iColormap) *255.0);
+#else
+      Float* pz = rgMMM + 3 * (j*cstep + i);
+      pz[0] = rq[3*j+1];
+      pz[1] = rq[3*j+2];
+      pz[2] = rq[3*j+3];
+      mmmMinMax[0] = std::min(mmmMinMax[0], pz[0]);
+      mmmMinMax[1] = std::max(mmmMinMax[1], pz[0]);
+      mmmMinMax[2] = std::min(mmmMinMax[2], pz[1]);
+      mmmMinMax[3] = std::max(mmmMinMax[3], pz[1]);
+      mmmMinMax[4] = std::min(mmmMinMax[4], pz[2]);
+      mmmMinMax[5] = std::max(mmmMinMax[5], pz[2]);
+#endif
     }
   }
+
+#ifdef adaptive_brightness
+  // Having accumulated MMM's, (slightly? weighted sum of original and normalized?) rescale them for adaptive brightness,
+  // before mapping them through ByteFromMMM().
+  // This effect gets stronger as widthLim decreases (from 8192 to 1024: see GL_MAX_TEXTURE_SIZE).
+  // Unfortunately, whenever this is visibly useful, it is also visibly discontinuous across chunk boundaries (see cchunk).
+  // Also, it's not obviously adaptive as you zoom into a dark region.
+  // todo: redesign this.
+  for (unsigned i=0; i<cstep; ++i) {
+    for (int j=0; j<jMax; ++j) {
+      Float* pz = rgMMM + 3 * (j*cstep + i);
+      const Float weight = 0.9;
+      pz[0] = lerp(0.1, pz[0], (pz[0]-mmmMinMax[0]) / (mmmMinMax[1]-mmmMinMax[0]));
+      pz[1] = lerp(0.1, pz[1], (pz[1]-mmmMinMax[2]) / (mmmMinMax[3]-mmmMinMax[2]));
+      pz[2] = lerp(0.1, pz[2], (pz[2]-mmmMinMax[4]) / (mmmMinMax[5]-mmmMinMax[4]));
+      // if (i==0) pz[0] = pz[1] = pz[2] = 1.0; // inject testpattern at start of each chunk
+    }
+  }
+
+  for (unsigned i=0; i<cstep; ++i) {
+    for (int j=0; j<jMax; ++j) {
+      const Float* yMMM = rgMMM + 3 * (j*cstep + i);
+      r[(j*cstep+i)] = (unsigned char)(ByteFromMMM(yMMM, iColormap) *255.0);
+    }
+  }
+  delete [] rgMMM;
+#endif
 }
 
 // Return interleaved min mean max as RGB, jMax copies concatenated.

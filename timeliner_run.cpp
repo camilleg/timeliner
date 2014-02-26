@@ -469,6 +469,8 @@ double dxChar = 0.01;
 #define font GLUT_BITMAP_9_BY_15
 
 template <class T> T sq(const T _) { return _*_; }
+template <class T> T cb(const T _) { return _*_*_; }
+template <class T> T fi(const T _) { return _*_*_*_; }
 
 // As z from 0 to 1, lerp from min to max.
 double geometriclerp(double z, double min, double max)
@@ -731,9 +733,28 @@ void setPalette(const int iShader, const GLfloat r, const GLfloat g, const GLflo
   static GLfloat bufPalette[3*128]; // One bufPalette is enough for multiple shaders.
   for (int i=0; i<128; ++i) {
     const GLfloat z(paletteBrightness * sq(i/127.0f));
-    bufPalette[3*i+0] = z * r;
-    bufPalette[3*i+1] = z * g;
-    bufPalette[3*i+2] = z * b;
+    switch (iShader) {
+    default:
+      bufPalette[3*i+0] = z * r;
+      bufPalette[3*i+1] = z * g;
+      bufPalette[3*i+2] = z * b;
+      break;
+    case 0:
+      // waveform
+      bufPalette[3*i+0] = i<127 ? 0.0 : r;
+      bufPalette[3*i+1] = i<127 ? 0.0 : g;
+      bufPalette[3*i+2] = i<127 ? 0.0 : b;
+      break;
+    case 1:
+      // blackbody: black red yellow white.
+      double hsv[3] = { cb(z) * 0.27, 1.0 - fi(z), z };
+      extern void RgbFromHsv(double*);
+      RgbFromHsv(hsv);
+      bufPalette[3*i+0] = hsv[0];
+      bufPalette[3*i+1] = hsv[1];
+      bufPalette[3*i+2] = hsv[2];
+      break;
+    }
   }
   assert(fShaderValid(iShader));
   assert(      glGetUniformLocation(myPrgs[iShader], "palette") >= 0);
@@ -741,7 +762,7 @@ void setPalette(const int iShader, const GLfloat r, const GLfloat g, const GLflo
 }
 
 void shaderRestart(const int iShader, const double r, const double g, const double b) {
-  // Recreating the shaders may be overkill for just redoing setPalette().
+  // Recompiling the shaders may be overkill for just redoing setPalette().
   shaderUse();
   if (fShaderValid(iShader))
     glDeleteProgram(myPrgs[iShader]);
@@ -802,8 +823,9 @@ void shaderRestart(const int iShader, const double r, const double g, const doub
 
 void kickShaders()
 {
-  for (unsigned i=0; i<features.size(); ++i)
-    shaderRestart(i, 0.9-0.1*i, 1.0, 0.4+0.1*i);
+  shaderRestart(0,  0.2, 1.0, 0.2); // waveform is green
+  for (unsigned i=1; i<features.size(); ++i)
+    shaderRestart(i,  0.9-0.2*i, 0.7, 0.4+0.1*i);
 }
 
 void shaderInit()
