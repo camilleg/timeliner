@@ -741,18 +741,18 @@ void setPalette(const int iShader, const GLfloat r, const GLfloat g, const GLflo
       break;
     case 0:
       // waveform
-      bufPalette[3*i+0] = i<127 ? 0.0 : r;
-      bufPalette[3*i+1] = i<127 ? 0.0 : g;
-      bufPalette[3*i+2] = i<127 ? 0.0 : b;
+      bufPalette[3*i+0] = i<127 ? 0.0f : r;
+      bufPalette[3*i+1] = i<127 ? 0.0f : g;
+      bufPalette[3*i+2] = i<127 ? 0.0f : b;
       break;
     case 1:
       // blackbody: black red yellow white.
       double hsv[3] = { cb(z) * 0.27, 1.0 - fi(z), z };
       extern void RgbFromHsv(double*);
       RgbFromHsv(hsv);
-      bufPalette[3*i+0] = hsv[0];
-      bufPalette[3*i+1] = hsv[1];
-      bufPalette[3*i+2] = hsv[2];
+      bufPalette[3*i+0] = GLfloat(hsv[0]);
+      bufPalette[3*i+1] = GLfloat(hsv[1]);
+      bufPalette[3*i+2] = GLfloat(hsv[2]);
       break;
     }
   }
