@@ -883,7 +883,8 @@ static Float ByteFromMMM(const Float* a, int iColormap)
 // Return conflated min mean max as a byte, jMax copies concatenated.
 void CHello::getbatchByte(unsigned char* r, const double t0, const double t1, const int jMax, const unsigned cstep, const int iColormap) const
 {
-#undef adaptive_brightness
+#undef adaptive_contrast	// Better.
+#undef adaptive_brightness	// Much slower.  Instead run on 8core, or precompute [tMin,tLim] for *all* chunks.
 #ifdef adaptive_brightness
   const Float m = std::numeric_limits<Float>::max();
   Float mmmMinMax[6] = { m,-m, m,-m, m,-m };
@@ -897,12 +898,29 @@ void CHello::getbatchByte(unsigned char* r, const double t0, const double t1, co
   for (unsigned i=0; i<cstep; ++i,t+=dt) {
     const Float tMin = Float(t - 0.5 * dt);
     const Float tLim = Float(t + 0.5 * dt);
-    const CQuartet q(recurse(layers, tMin, tLim, layers->size() - 1, 0));
+    const CQuartet q(recurse(layers, tMin, tLim, layers->size()-1, 0));
     const CQuartet& rq = q ? q : *dummyCur;
     for (int j=0; j<jMax; ++j) {
 #ifndef adaptive_brightness
+#ifndef adaptive_contrast
       const Float yMMM[3] = {rq[3*j+1], rq[3*j+2], rq[3*j+3]};
-      r[(j*cstep+i)] = (unsigned char)( ByteFromMMM(yMMM, iColormap) *255.0);
+      r[(j*cstep+i)] = (unsigned char)(ByteFromMMM(yMMM, iColormap) *255.0);
+#else
+      // Normalize MMM against not this chunk, but the min and max of a t-interval 1000x wider.
+      // todo: 1000 becomes a param of getbatchByte();  stack 3 variants of this feature to see simultaneously.
+      // todo: disable for features like waveform which are "indexed color" not "grayscale".
+      Float yMMM[3] = {rq[3*j+1], rq[3*j+2], rq[3*j+3]};
+      const double dt = tLim-tMin;
+      const double diameter = 70.0; // 30 is noisy. 100 is subtle for test-openhouse. 1000.0 is invisible in test-mono.
+      const CQuartet qSurround(recurse(layers, tMin-diameter*dt, tLim+diameter*dt, layers->size()-1, 0));
+      const CQuartet& rqSurround = qSurround ? qSurround : *dummyCur;
+      const Float yMMMSurround[3] = {rqSurround[3*j+1], rqSurround[3*j+2], rqSurround[3*j+3]};
+      for (int k=0; k<3; ++k) {
+	Float& z = yMMM[k];
+	z = lerp(0.1/*wild guess*/, z, (z-yMMMSurround[0]) / (yMMMSurround[2]-yMMMSurround[0]));
+      }
+      r[(j*cstep+i)] = (unsigned char)(ByteFromMMM(yMMM, iColormap) *255.0);
+#endif
 #else
       Float* pz = rgMMM + 3 * (j*cstep + i);
       pz[0] = rq[3*j+1];
