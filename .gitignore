@@ -22,3 +22,5 @@ timeliner_prp
 example/*/marshal/features*
 timeliner/*/freeglut.dll
 timeliner/*/libsndfile-1.dll
+timeliner/zlib1.dll
+timeliner/libpng12.dll
