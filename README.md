@@ -2,7 +2,13 @@
 
 A browser for long audio recordings.
 
-### How to build and run Timeliner on Ubuntu 10.04 or 12.04
+1-minute [example video](http://vimeo.com/88076447).
+
+6-page [description](http://zx81.isl.uiuc.edu/camilleg/acmmm12.pdf).
+
+News story giving [historical context](http://www.ece.illinois.edu/mediacenter/article.asp?id=7568).
+
+### Building on Ubuntu 10.04 or 12.04
 
 `sudo apt-get install g++ freeglut3-dev gsl-bin libgsl0-dev libglm-dev libsndfile1-dev \`
 `libxi-dev libxmu-dev libasound2-dev audiofile-tools libglew-dev libpng12-dev`
@@ -16,7 +22,7 @@ Optionally install [QuickNet](http://www.icsi.berkeley.edu/Speech/qn.html).
 
 `make`
 
-### How to build Timeliner on Windows
+### Building on Windows
 
 Install [libsndfile](http://www.mega-nerd.com/libsndfile/#Download).
 Use the 32-bit version, not the 64-bit.
@@ -59,9 +65,7 @@ Run the projects `timeliner_pre` and `timeliner` (hit Ctrl+F5).
 
 (Audio is built on RtAudio, which uses Windows' own DirectSound.)
 
-### How to adjust Timeliner
-
-Read the paper [Effective Browsing of Long Audio Recordings](http://zx81.isl.uiuc.edu/camilleg/acmmm12.pdf).
+### How to adjust
 
 The maximum width of a vector of values in a node of the agglomerative cache
 is the compile-time constant `CQuartet_widthMax` in `timeliner_cache.h`.
