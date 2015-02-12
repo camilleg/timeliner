@@ -1,4 +1,4 @@
-### timeliner
+### Timeliner
 
 A browser for long audio recordings.
 
