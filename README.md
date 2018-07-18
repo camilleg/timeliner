@@ -6,26 +6,25 @@ A browser for long audio recordings.
 
 6-page [description](http://zx81.isl.uiuc.edu/camilleg/acmmm12.pdf).
 
-News story giving [historical context](http://www.ece.illinois.edu/mediacenter/article.asp?id=7568).
+News story giving [historical context](www.ece.illinois.edu/mediacenter/article.asp?id=7568).
 
 ### Building on Ubuntu 10.04 or 12.04
 
-`sudo apt-get install g++ freeglut3-dev gsl-bin libgsl0-dev libglm-dev libsndfile1-dev \`
-`libxi-dev libxmu-dev libasound2-dev audiofile-tools libglew-dev libpng12-dev`
+`sudo apt-get install g++ freeglut3-dev gsl-bin libgsl0-dev libglm-dev libsndfile1-dev libxi-dev libxmu-dev libasound2-dev audiofile-tools libglew-dev libpng12-dev`
 
 Install [HTK 3.4.1](http://htk.eng.cam.ac.uk).
-(To handle files larger than 2 GB on 64-bit Linux:
+(For audio files exceeding 2 GB on 64-bit Linux:
 after running HTK's `./configure`, but before running `make`,
 in all of HTK's subdiectories' Makefiles, remove `-m32` from the `CFLAGS` definitions.)
 
-Optionally install [QuickNet](http://www.icsi.berkeley.edu/Speech/qn.html).
+Optionally install [QuickNet](www.icsi.berkeley.edu/Speech/qn.html).
 
 `make`
 
 ### Building on Windows
 
-Install [libsndfile](http://www.mega-nerd.com/libsndfile/#Download).
-Use the 32-bit version, not the 64-bit.
+Install [libsndfile](www.mega-nerd.com/libsndfile/#Download).
+Use the 32-bit version, not the 64-bit one.
 
 Install Microsoft Visual Studio Express 2012 for Windows Desktop.
 
@@ -45,7 +44,7 @@ or copy `bin.win32/HCopy.exe` to some folder on your PATH.
 
 Install [libpng](http://gnuwin32.sourceforge.net/packages/libpng.htm).
 
-Install [zlib](http://zlib.net/).
+Install [zlib](http://zlib.net).
 
 Start Visual Studio.  Open timeliner\timeliner.sln.
 Within that solution, in each project, rightclick Properties;
