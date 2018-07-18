@@ -6,7 +6,7 @@ A browser for long audio recordings.
 
 6-page [description](http://zx81.isl.uiuc.edu/camilleg/acmmm12.pdf).
 
-News story giving [historical context](www.ece.illinois.edu/mediacenter/article.asp?id=7568).
+News story giving [historical context](http://www.ece.illinois.edu/mediacenter/article.asp?id=7568).
 
 ### Building on Ubuntu 10.04 or 12.04
 
@@ -17,13 +17,13 @@ Install [HTK 3.4.1](http://htk.eng.cam.ac.uk).
 after running HTK's `./configure`, but before running `make`,
 in all of HTK's subdiectories' Makefiles, remove `-m32` from the `CFLAGS` definitions.)
 
-Optionally install [QuickNet](www.icsi.berkeley.edu/Speech/qn.html).
+Optionally install [QuickNet](http://www.icsi.berkeley.edu/Speech/qn.html).
 
 `make`
 
 ### Building on Windows
 
-Install [libsndfile](www.mega-nerd.com/libsndfile/#Download).
+Install [libsndfile](http://www.mega-nerd.com/libsndfile/#Download).
 Use the 32-bit version, not the 64-bit one.
 
 Install Microsoft Visual Studio Express 2012 for Windows Desktop.
