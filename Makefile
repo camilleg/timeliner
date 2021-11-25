@@ -16,7 +16,7 @@ LIBS_RUN = -lasound -lglut -lGLU -lGL -lGLEW -L/usr/X11R6/lib -lXmu -lXi -lXext 
 all: test-mono
 
 clean:
-	rm -f timeliner_run timeliner_prp $(OBJS_ALL) timeliner.log example/mono/marshal/*
+	rm -f timeliner_run timeliner_prp $(OBJS_ALL) timeliner.log
 
 .cpp.o: $(HDRS)
 	g++ $(CFLAGS) -c $<
