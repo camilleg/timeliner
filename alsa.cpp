@@ -3,7 +3,7 @@
 #include <alsa/asoundlib.h>
 #include <math.h>
 
-const char *device = "plughw:0,0"; /* playback device */
+const char *device = "default"; /* playback device */
 const snd_pcm_format_t format = SND_PCM_FORMAT_S16; /* sample format */
 const unsigned int rate = 16000; /* stream rate */
 const unsigned int channels = 1; /* count of channels */

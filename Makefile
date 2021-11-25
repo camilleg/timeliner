@@ -30,16 +30,16 @@ timeliner_prp: $(OBJS_PRE)
 # because that's a symlink with an irrelevant timestamp.
 
 test-EEG: timeliner_run Makefile
-	export ALSA_CARD=0 && ./timeliner_run example/EEG/marshal
+	./timeliner_run example/EEG/marshal
 example/EEG/marshal/mixed.wav: timeliner_prp /r/timeliner/testcases/eeg/eeg.rec example/EEG/config.txt
 	cd example && ../timeliner_prp EEG/marshal EEG/config.txt
 
 test-stereo: timeliner_run Makefile
-	export ALSA_CARD=0 && ./timeliner_run example/stereo/marshal
+	./timeliner_run example/stereo/marshal
 example/stereo/marshal/mixed.wav: timeliner_prp example/stereo/choral-stereo.wav example/stereo/config.txt
 	cd example && ../timeliner_prp stereo/marshal stereo/config.txt
 
 test-mono: timeliner_run Makefile
-	export ALSA_CARD=0 && ./timeliner_run example/mono/marshal
+	./timeliner_run example/mono/marshal
 example/mono/marshal/mixed.wav: timeliner_prp example/mono/choral.wav example/mono/config.txt
 	cd example && ../timeliner_prp mono/marshal mono/config.txt
