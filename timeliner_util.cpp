@@ -2,8 +2,8 @@
 #include "timeliner_util.h"
 
 #include <cassert>
-#include <string>
 #include <fcntl.h>
+#include <unistd.h>
 #ifndef _MSC_VER
 #include <sys/mman.h>
 #include <sys/stat.h>
