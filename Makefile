@@ -3,11 +3,11 @@ CFLAGS = -O3 -Wall -ffast-math -fexpensive-optimizations -fomit-frame-pointer -m
 # CFLAGS += -DNDEBUG 
 # CFLAGS += -g -O0
 
-HDRS = timeliner_diagnostics.h timeliner_cache.h timeliner_util.h
+HDRS = timeliner_diagnostics.h timeliner_cache.h timeliner_util.h timeliner_util_threads.h timeliner_feature.h
 
 OBJS     = timeliner_util.o timeliner_diagnostics.o timeliner_cache.o
 OBJS_PRE = $(OBJS) timeliner_pre.o
-OBJS_RUN = $(OBJS) timeliner_run.o alsa.o
+OBJS_RUN = $(OBJS) timeliner_run.o timeliner_util_threads.o timeliner_feature.o alsa.o
 OBJS_ALL = $(OBJS_RUN) $(OBJS_PRE)
 
 LIBS_PRE = -lsndfile -lgsl -lblas 

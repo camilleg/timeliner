@@ -3,6 +3,16 @@
 #include <windows.h>
 #endif
 
+// T is float or Float or double
+template <class T> T sq(const T _) { return _*_; }
+template <class T> T cb(const T _) { return _*_*_; }
+template <class T> T fi(const T _) { return _*_*_*_; }
+
+// As key goes from 0 to 1, return from a to b.
+template <class T> T lerp(const T& key, const T& a, const T& b) { return key*b + (1-key)*a; }
+
+// Memory-mapped read-only files.
+
 class Mmap {
   char* _pch;
 #ifdef _MSC_VER

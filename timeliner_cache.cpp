@@ -6,6 +6,7 @@
 #include <limits>
 
 #include "timeliner_cache.h"
+#include "timeliner_util.h"
 
 #undef VERBOSE
 
@@ -273,9 +274,9 @@ CHello::CHello(const float* const aSrc, const long cs, const Float hzArg, const 
 #ifndef _MSC_VER
 	    // VS2013 only got std::isnan in July 2013:
 	    // http://blogs.msdn.com/b/vcblog/archive/2013/07/19/c99-library-support-in-visual-studio-2013.aspx
-		assert(!isnan(L[j+__+3]));
-	    assert(!isnan(L[j+__+4]));
-	    assert(!isnan(L[j+__+5]));
+		assert(!std::isnan(L[j+__+3]));
+	    assert(!std::isnan(L[j+__+4]));
+	    assert(!std::isnan(L[j+__+5]));
 #endif
 	    assert(L[j+__+3] <= L[j+__+4] + epsilon); // min <= mean
 	    assert(L[k+__+3] <= L[k+__+4] + epsilon); // min <= mean
@@ -626,7 +627,7 @@ static inline const CQuartet merge_for_recurse(const CQuartet& a, const CQuartet
       (a[0]*a[2] + b[0]*b[2]) / numEls,
       std::max(a[3], b[3]));
 
-  static Float t[1+CQuartet_widthMax*3];
+  Float t[1+CQuartet_widthMax*3]; // static would be cute, but not thread-safe.  Just use the stack.
   t[0] = numEls;
   for (unsigned i=0; i<w; ++i) {
     const unsigned di = 1+3*i;
@@ -781,15 +782,6 @@ void RgbFromHsv(Float* a)
   a[0]=0.0; a[1]=0.0; a[2]=0.0;
 }
 
-static inline Float sq(Float _)
-  { return _*_; }
-
-static inline Float lerp(Float key, Float a, Float b)
-{
-  // As key goes from 0 to 1, return from a to b.
-  return key*b + (1.0F-key)*a;
-}
-
 // Convert minmeanmax in-place to rgb.
 // Assumes min,mean,max all in [0,1].
 static void RgbFromMMM(Float* a, int iColormap)
@@ -868,13 +860,13 @@ static Float ByteFromMMM(const Float* a, int iColormap)
       return a[2]; // max
     case 3: // wavelet
       // max, and somewhat mean
-      return lerp(0.8f, a[2], a[1]);
+      return lerp(0.8, a[2], a[1]);
     case 0: // feaFB filterbank
       // max, and somewhat mean
-      return lerp(0.7f, a[2], a[1]);
+      return lerp(0.7, a[2], a[1]);
     case 1: // feaMFCC
       // max, and somewhat mean
-      return lerp(0.6f, a[2], sq(a[1]));
+      return lerp(0.6, a[2], sq(a[1]));
     default: // Saliency
       return a[2];
   }

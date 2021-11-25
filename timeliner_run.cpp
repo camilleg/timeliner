@@ -6,6 +6,7 @@
 #include "timeliner_diagnostics.h"
 #include "timeliner_cache.h"
 #include "timeliner_util.h" // #includes <windows.h>
+#include "timeliner_util_threads.h"
 
 // Linux:   apt-get install libsndfile1-dev
 // Windows: www.mega-nerd.com/libsndfile/ libsndfile-1.0.25-w64-setup.exe
@@ -180,159 +181,7 @@ short* wavS16 = NULL;
 
 bool onscreen(const double sec) { return sec >= tShow[0] && sec <= tShow[1]; }
 
-#ifdef _MSC_VER
-#include <process.h>
-#else
-#include <pthread.h>
-#endif
-
-// Windows version and extra features are in syzygy's language/arThread.h,
-// from which this is excerpted.
-class arLock {
-#ifdef _MSC_VER
-  HANDLE _mutex;
-  bool _fOwned; // Owned by this app.  Does NOT mean "locked."
-  bool _fLocked;
-#else
-  pthread_mutex_t _mutex;
-#endif
-public:
-
-#ifdef _MSC_VER
-  arLock() : _fOwned(true) {
-    _mutex = CreateMutex(NULL, FALSE, NULL);
-    const DWORD e = GetLastError();
-    if (e == ERROR_ALREADY_EXISTS && _mutex) {
-      // Another app has this.  (Only do this with global things like arLogStream.)
-      _fOwned = false;
-    }
-	if (_mutex != NULL)
-	  // success
-      return;
-    if (e == ERROR_ALREADY_EXISTS) {
-      std::cerr << "arLock warning: CreateMutex failed (already exists).\n";
-      return;
-    }
-    if (e == ERROR_ACCESS_DENIED) {
-      std::cerr << "arLock warning: CreateMutex failed (access denied); backing off.\n";
-LBackoff:
-      // _mutex = OpenMutex(SYNCHRONIZE, FALSE, name);
-      // Fall back to a mutex of scope "app" not "the entire PC".
-      _mutex = CreateMutex(NULL, FALSE, NULL);
-      if (!_mutex) {
-        std::cerr << "arLock warning: failed to create mutex.\n";
-      }
-    }
-    else if (e == ERROR_PATH_NOT_FOUND) {
-      std::cerr << "arLock warning: CreateMutex failed (backslash?); backing off.\n";
-      goto LBackoff;
-    }
-    else {
-      std::cerr << "arLock warning: CreateMutex failed; backing off.\n";
-      goto LBackoff;
-    }
-  }
-
-  bool valid() const { return _mutex != NULL; }
-
-  ~arLock() {
-    if (_fOwned && _mutex) {
-      (void)ReleaseMutex(_mutex); // paranoid
-      CloseHandle(_mutex);
-    }
-  }
-
-  void lock() {
-    if (!valid()) return;
-    const DWORD msecTimeout = 3000;
-    for (;;) {
-      const DWORD r = WaitForSingleObject( _mutex, msecTimeout );
-      switch (r) {
-      case WAIT_OBJECT_0:
-	_fLocked = true;
-	return;
-      default:
-      case WAIT_ABANDONED:
-	// Another thread terminated without releasing _mutex.
-	// << "arLock acquired abandoned lock.\n";
-	return;
-      case WAIT_TIMEOUT:
-	break;
-      case WAIT_FAILED:
-	const DWORD e = GetLastError();
-	if (e == ERROR_INVALID_HANDLE) {
-	  // << "arLock warning: invalid handle.\n";
-	  // _mutex is bad, so stop using it.
-	  _mutex = NULL;
-	  // Desperate fallback: create a fresh (unnamed) mutex.
-	  _mutex = CreateMutex(NULL, FALSE, NULL);
-	  if (_mutex)
-	    continue;
-	  // << "arLock unrecoverably failed to recreate handle.\n";
-	}
-	else {
-	  // << "arLock internal error: GetLastError()==" << e << ".\n";
-	}
-	return;
-      }
-    }
-  }
-  void unlock() {
-    if (!ReleaseMutex(_mutex)) {
-      // << "arLock warning: failed to unlock.\n";
-      CloseHandle(_mutex);
-      _mutex = NULL;
-    };
-  }
-
-#else
-
-  arLock() {
-    pthread_mutexattr_t attr;
-    pthread_mutexattr_init(&attr);
-    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_DEFAULT);
-    pthread_mutex_init(&_mutex, &attr);
-    pthread_mutexattr_destroy(&attr);
-  }
-  ~arLock() {
-    pthread_mutex_destroy(&_mutex);
-  }
-
-  void lock() {
-    // A relative time (a duration) requires pthread_mutex_timedlock_np
-    // or pthread_mutex_reltimedlock_np, but Ubuntu doesn't define those.
-    struct timespec t;
-    clock_gettime(CLOCK_REALTIME, &t);
-    t.tv_sec += 1; // Overkill.  Slower than that really shouldn't happen with only 3 threads.
-    const int r = pthread_mutex_timedlock(&_mutex, &t);
-    if (r != 0) {
-      switch(r) {
-	case EINVAL: fprintf(stderr, "EINVAL\n"); break;
-	case ETIMEDOUT: fprintf(stderr, "ETIMEDOUT\n"); break;
-	case EAGAIN: fprintf(stderr, "EAGAIN\n"); break;
-	case EDEADLK: fprintf(stderr, "EDEADLK\n"); break;
-	default: fprintf(stderr, "unknown\n"); break;
-      }
-      quit("internal mutex error");
-    }
-  }
-  void unlock() {
-    pthread_mutex_unlock(&_mutex);
-  }
-
-#endif
-
-};
-
 int SR = -1;
-
-// Implicitly unlocks when out of scope.
-class arGuard {
-  arLock& _l;
-public:
-  arGuard(arLock& l): _l(l) { _l.lock(); }
-  ~arGuard() { _l.unlock(); }
-};
 
 arLock vlockAudio; // guards next three
 int vnumSamples = 0; // high-low-water-mark between samplewriter() and samplereader()
@@ -468,10 +317,6 @@ int pixelSize[2] = {1000,1000};
 double dxChar = 0.01;
 #define font GLUT_BITMAP_9_BY_15
 
-template <class T> T sq(const T _) { return _*_; }
-template <class T> T cb(const T _) { return _*_*_; }
-template <class T> T fi(const T _) { return _*_*_*_; }
-
 // As z from 0 to 1, lerp from min to max.
 double geometriclerp(double z, double min, double max)
 {
@@ -481,11 +326,6 @@ double geometriclerp(double z, double min, double max)
   min = sqrt(min);
   max = sqrt(max);
   return sq((z-min) / (max-min));
-}
-
-double lerp(const double z, const double min, const double max)
-{
-  return z*max + (1.0-z)*min;
 }
 
 // To set color: *before* glRasterPos2d, call glColor (with lighting disabled).
@@ -505,216 +345,12 @@ void prepTexture(const GLuint t)
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 }
 
-void prepTextureMipmap(const GLuint t)
-{
-  glBindTexture(GL_TEXTURE_1D, t);
-  assert(glIsTexture(t) == GL_TRUE);
-  // Prevent bleeding onto opposite edges like a torus.
-#ifndef GL_CLAMP_TO_EDGE
-  #define GL_CLAMP_TO_EDGE 0x812F
-#endif
-  glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-  glTexParameterf(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR );
-  //needed? glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_PRIORITY, 0.99);
-}
-
-float gpuMBavailable()
-{
-  // glerror GL_OUT_OF_MEMORY ?
-  // kernel: [4391985.748987] NVRM: VM: nv_vm_malloc_pages: failed to allocate contiguous memory
-
-  // http://developer.download.nvidia.com/opengl/specs/GL_NVX_gpu_memory_info.txt
-  // AMD/ATI equivalent: WGL_AMD_gpu_association wglGetGPUIDsAMD wglGetGPUIDsAMD wglGetGPUInfoAMD
-  // www.opengl.org/registry/specs/ATI/meminfo.txt
-#if 0
-  #define GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX 0x9047
-  GLint total_mem_kb = 0;
-  glGetIntegerv(GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &total_mem_kb);
-#endif
-  #define GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX 0x9049
-  GLint cur_avail_mem_kb = 0;
-  glGetIntegerv(GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &cur_avail_mem_kb);
-  return cur_avail_mem_kb/1000.0F;
-
-  // A feature of width 65536 (almost 11 minutes at 100 samples/sec)
-  // uses ~145 MB texture RAM.
-  // That's 8 chunks of width 8192.
-  // 1 chunk is 8192x1 texels * 2 for mipmap * 3 for GL_RGB * 62 vectorsize = 3047424 B = 2.9MB;
-  // 8 chunks is 23 MB.  But 145MB is used?!  (RGBA not just RGB?)
-}
-
 #ifdef _MSC_VER
 inline float drand48() { return float(rand()) / float(RAND_MAX); }
 #endif
 
-class Feature {
+WorkerPool* pool = NULL;
 
-  enum { vecLim = CQuartet_widthMax+1 }; // from timeliner_cache.h
-  static int mb;
-  enum { mbUnknown, mbZero, mbPositive };
-
-  class Slartibartfast {
-  public:
-    GLuint tex[vecLim];
-  };
-
-public:
-  int cchunk;
-  std::vector<Slartibartfast> rgTex;
-
-  Feature(int /*iColormap*/, const std::string& filename, const std::string& dirname): m_fValid(false) {
-    if (mb == mbUnknown) {
-      mb = gpuMBavailable() > 0.0f ? mbPositive : mbZero;
-      if (!hasGraphicsRAM())
-	warn("Found no dedicated graphics RAM.  Might run slowly.");
-    }
-    const Mmap marshaled_file(dirname + "/" + filename);
-    if (!marshaled_file.valid())
-      return;
-    binaryload(marshaled_file.pch(), marshaled_file.cch()); // stuff many member variables
-    makeMipmaps();
-    m_fValid = true;
-    // ~Mmap closes file
-  };
-
-  bool hasGraphicsRAM() const { return mb == mbPositive; }
-
-  void binaryload(const char* pch, long cch) {
-    assert(4 == sizeof(float));
-    strcpy(m_name, pch);				pch += strlen(m_name);
-    m_iColormap = int(*(float*)pch);		pch += sizeof(float);
-    m_period = *(float*)pch;			pch += sizeof(float);
-    const int slices = int(*(float*)pch);	pch += sizeof(float);
-    m_vectorsize = int(*(float*)pch);		pch += sizeof(float);
-    m_pz = (const float*)pch; // m_cz floats.  Not doubles.
-    m_cz = (cch - long(strlen(m_name) + 4*sizeof(float))) / 4;
-#ifndef NDEBUG
-    printf("debugging feature: name %s, colormap %d, period %f, slices %d, width %d, cz %lu.\n", m_name, m_iColormap, m_period, slices, m_vectorsize, m_cz);
-#endif
-    if (m_iColormap<0 || m_period<=0.0 || slices<=0 || m_vectorsize<=0) {
-      quit("binaryload: feature '" + std::string(m_name) + "' has corrupt data");
-    }
-    assert(slices*m_vectorsize == m_cz);
-#ifdef NDEBUG
-    _unused(slices);
-#else
-
-#ifndef _MSC_VER
-	// VS2013 only got std::isnormal and std::fpclassify in July 2013:
-	// http://blogs.msdn.com/b/vcblog/archive/2013/07/19/c99-library-support-in-visual-studio-2013.aspx
-	for (int i=0; i<m_cz; ++i) {
-    if (!std::isnormal(m_pz[i]) && m_pz[i] != 0.0) {
-	printf("binaryload: feature's float %d of %ld is bogus: class %d, value %f\n", i, m_cz, std::fpclassify(m_pz[i]), m_pz[i]);
-	quit("");
-      }
-    }
-#endif
-#endif
-  };
-
-  bool fValid() const { return m_fValid; }
-  int vectorsize() const { return m_vectorsize; }
-  int samples() const { return m_cz / m_vectorsize; }
-  const char* name() const { return m_name; }
-
-  void makeMipmaps() {
-    // Adaptive subsample is too tricky, until I can better predict GL_GPU_MEM_INFO_CURRENT_AVAILABLE_MEM_NVX.
-    // (Adapt the prediction itself??  Allocate a few textures of various sizes, and measure reported GL_GPU_MEM_INFO_CURRENT_AVAILABLE_MEM_NVX.  But implement this only after getting 2 or 3 different PCs to test it on.)
-    // Subsampling to coarser than 100 Hz would be pretty limiting.
-    const char* pch = getenv("timeliner_zoom");
-    unsigned subsample = pch ? atoi(pch) : 1;
-    if (subsample < 1)
-      subsample = 1;
-    if (subsample > 1)
-      printf("Subsampling %dx from environment variable timeliner_zoom.\n", subsample);
-
-    const int csample = samples();
-
-    // Smallest power of two that exceeds features' # of samples.
-    unsigned width = 1;
-    while (width < csample/subsample)
-      width *= 2;
-    //printf("feature has %d samples, for tex-chunks' width %d.\n", csample, width);
-
-    // Minimize cchunk to conserve RAM and increase FPS.
-    {
-      GLint widthLim; // often 2048..8192 (zx81 has 8192), rarely 16384, never greater.
-      glGetIntegerv(GL_MAX_TEXTURE_SIZE, &widthLim);
-      assert(widthLim >= 0); // because width is unsigned
-      if (width > unsigned(widthLim)) assert(width%widthLim==0);	// everything is a power of two
-      cchunk = width<unsigned(widthLim) ? 1 : width/widthLim;
-      //printf("width = %d, cchunk = %d, widthLim = %d\n", width, cchunk, widthLim);
-      if (width >= unsigned(widthLim))
-	assert(GLint(width/cchunk) == widthLim);
-    }
-
-    rgTex.resize(cchunk);
-    for (int ichunk=0; ichunk<cchunk; ++ichunk) {
-      glGenTextures(m_vectorsize, rgTex[ichunk].tex);
-      for (int j=0; j < m_vectorsize; ++j)
-	prepTextureMipmap(rgTex[ichunk].tex[j]);
-    }
-
-    const CHello cacheHTK(m_pz, m_cz, 1.0f/m_period, subsample, m_vectorsize);
-    glEnable(GL_TEXTURE_1D);
-    const float mb0 = hasGraphicsRAM() ? gpuMBavailable() : 0.0f;
-    // www.opengl.org/archives/resources/features/KilgardTechniques/oglpitfall/ #5 Not Setting All Mipmap Levels.
-    for (unsigned level=0; (width/cchunk)>>level >= 1; ++level) {
-      //printf("  computing feature's mipmap level %d.\n", level);
-      makeTextureMipmap(cacheHTK, level, width >> level);
-    }
-
-    if (hasGraphicsRAM()) {
-      const float mb1 = gpuMBavailable();
-      printf("Feature used %.1f graphics MB;  %.0f MB remaining.\n", mb0-mb1, mb1);
-      if (mb1 < 50.0) {
-#ifdef _MSC_VER
-	warn("Running out of graphics RAM.  Try increasing the environment variable timeliner_zoom to 15 or so.");
-#else
-	// Less than 50 MB free may hang X.  Mouse responsive, Xorg 100% cpu, network up, console frozen.
-	// Or, the next request may "go negative", mb0-mb1<0.
-	warn("Running out of graphics RAM.  Try export timeliner_zoom=15.");
-#endif
-      }
-    }
-  }
-
-  const void makeTextureMipmap(const CHello& cacheHTK, const int mipmaplevel, int width) const {
-    assert(vectorsize() <= vecLim);
-    assert(width % cchunk == 0);
-    width /= cchunk;
-
-    //if (mipmaplevel<3) printf("    Computing %d mipmaps of width %d.\n", cchunk, width);
-    //printf("vectorsize %d\n", vectorsize());
-    unsigned char* bufByte = new unsigned char[vectorsize()*width];
-    for (int ichunk=0; ichunk<cchunk; ++ichunk) {
-      const double chunkL = ichunk     / double(cchunk); // e.g., 5/8
-      const double chunkR = (ichunk+1) / double(cchunk); // e.g., 6/8
-      cacheHTK.getbatchByte(bufByte,
-	  lerp(chunkL, tShowBound[0], tShowBound[1]),
-	  lerp(chunkR, tShowBound[0], tShowBound[1]),
-	  vectorsize(), width, m_iColormap);
-      for (int j=0; j<vectorsize(); ++j) {
-	assert(glIsTexture(rgTex[ichunk].tex[j]) == GL_TRUE);
-	glBindTexture(GL_TEXTURE_1D, rgTex[ichunk].tex[j]);
-	glTexImage1D(GL_TEXTURE_1D, mipmaplevel, GL_INTENSITY8, width, 0, GL_RED, GL_UNSIGNED_BYTE, bufByte + width*j);
-      }
-    }
-    delete [] bufByte;
-  };
-
-private:
-  bool m_fValid;
-  int m_iColormap;
-  float m_period;	// seconds per sample
-  int m_vectorsize;	// e.g., how many frequency bins in a spectrogram
-  const float* m_pz;	// m_pz[0..m_cz] is the (vectors of) raw data
-  long m_cz;
-  char m_name[1000];
-};
 int Feature::mb = mbUnknown;
 std::vector<Feature*> features;
 
@@ -1809,7 +1445,7 @@ void moviePlayback()
       }
       // movieDir exists.
     }
-    (void)system("/bin/rm -f /run/shm/timeliner/*.png");
+    (void)!system("/bin/rm -f /run/shm/timeliner/*.png");
     // Removing either the nonempty dir or the wildcard *.png, without system(),
     // is necessarily elaborate: http://stackoverflow.com/questions/1149764/delete-folder-with-items
 #endif
@@ -1847,7 +1483,8 @@ void movieSaveFrame()
   char filename[80];
   sprintf(filename, "%s%05d.png", movieDir, izPlayback);
   screenshot(filename);
-  // Afterwards: cd /run/shm/timeliner; ffmpeg -y -i %05d.png -c:v h264 timeliner.mov
+  // Afterwards: cd /run/shm/timeliner; ..../movie-soundtrack.rb; ffmpeg -y -r 30 -i %05d.png -i out.wav -map 0:0 -map 1:0 -ar 44100 -c:v h264 out.mov
+  // Then optionally crop: ffmpeg -i out.mov -t 60 -c:a copy -c:v copy outShorter.mov
 }
 #endif
 
@@ -2155,6 +1792,7 @@ int main(int argc, char** argv)
   else {
     info("cached HTK features");
   }
+
   shaderInit();
 
   glGenTextures(1, &texNoise);

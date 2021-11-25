@@ -8,6 +8,8 @@ A browser for long audio recordings.
 
 News story giving [historical context](http://www.ece.illinois.edu/mediacenter/article.asp?id=7568).
 
+<!-- Ubuntu 18.04 needs at least libglew-dev libxmu-dev -->
+
 ### Building on Ubuntu 10.04 or 12.04
 
 `sudo apt-get install g++ freeglut3-dev gsl-bin libgsl0-dev libglm-dev libsndfile1-dev libxi-dev libxmu-dev libasound2-dev audiofile-tools libglew-dev libpng12-dev`
