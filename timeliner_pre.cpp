@@ -33,7 +33,7 @@
 inline double round(const double x) { return floor(x + 0.5); }
 #else
 #include <arpa/inet.h> // ntohl(), etc
-#include <gsl/gsl_wavelet.h>
+#include <gsl/gsl_wavelet.h> // apt install libgsl-dev
 #include <pthread.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
@@ -466,7 +466,7 @@ bool CopyFile(const char* filenameSrc, const char* filenameDst)
   const std::string src = filenameSrc[0] == '/' ? filenameSrc : get_current_dir_name() + std::string("/") + filenameSrc ;
   // std::cout << "Making symlink from " << src << " to  " << filenameDst << "\n";
   (void)remove(filenameDst); // otherwise symlink() fails
-  (void)symlink(src.c_str(), filenameDst);
+  (void)!symlink(src.c_str(), filenameDst);
   return true;
 #else
   const size_t cb = 4194304; // 4 MB
