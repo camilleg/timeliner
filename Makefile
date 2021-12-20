@@ -1,7 +1,6 @@
 CFLAGS := -std=c++17 -O3 -Wall -ffast-math -fexpensive-optimizations -fomit-frame-pointer -maccumulate-outgoing-args -pedantic
 # When compiling on a 32-bit OS, add -D_FILE_OFFSET_BITS=64
 # CFLAGS += -DNDEBUG 
-# CFLAGS += -g -O0
 
 HDRS = timeliner_diagnostics.h timeliner_cache.h timeliner_util.h timeliner_util_threads.h timeliner_feature.h
 
@@ -10,8 +9,11 @@ OBJS_PRE = $(OBJS) timeliner_pre.o
 OBJS_RUN = $(OBJS) timeliner_run.o timeliner_util_threads.o timeliner_feature.o alsa.o
 OBJS_ALL = $(OBJS_RUN) $(OBJS_PRE)
 
-LIBS_PRE = -lsndfile -lgsl -lgslcblas
-LIBS_RUN = -lasound -lglut -lGLU -lGL -lGLEW -L/usr/X11R6/lib -lXmu -lXi -lXext -lX11 -lsndfile -lpng -lpthread -lrt
+LIBS_PRE := -lsndfile -lgsl -lgslcblas
+LIBS_RUN := -lasound -lglut -lGLU -lGL -lGLEW -L/usr/X11R6/lib -lXmu -lXi -lXext -lX11 -lsndfile -lpng -lpthread -lrt
+
+# Optional file containing debugging options for CFLAGS and LIBS_*.
+-include Rules.debug
 
 all: test-mono
 
