@@ -16,7 +16,7 @@
 // Linux:   apt-get install libglew-dev
 // Windows: http://glew.sourceforge.net/install.html
 #include <GL/glew.h> // before gl.h
-#include <GL/glut.h>
+#include <GL/freeglut.h> // Instead of glut.h, to get glutLeaveMainLoop().
 
 // Linux:   apt-get install libpng12-dev
 // Windows: http://gnuwin32.sourceforge.net/packages/libpng.htm and http://zlib.net/
@@ -50,7 +50,7 @@
 #define GLUT_WHEEL_DOWN (4)
 #endif
 
-#define making_movie
+#undef making_movie
 #ifdef making_movie
 double sMovieRecordingStart = -1.0;
 bool fMovieRecording = false;
@@ -1017,8 +1017,6 @@ void drawCursors()
   glEnd();
 }
 
-bool vfQuit = false;
-
 double xyPanPrev[2] = {0.0, 0.0};
 inline double xFromMouse(const double xM) { return       xM/pixelSize[0]; }
 inline double yFromMouse(const double yM) { return 1.0 - yM/pixelSize[1]; }
@@ -1039,15 +1037,18 @@ void warnIgnoreKeystroke(const unsigned char key)
   printf("\n");
 }
 
+bool vfQuit = false;
 void appQuit()
 {
   vfQuit = true;
-  snooze(0.4); // let other threads notice vfQuit
-  exit(0);
+  snooze(0.2); // let other threads notice vfQuit
+  glutLeaveMainLoop();
 }
 
 void keyboard(const unsigned char key, const int x, int /*y*/)
 {
+  if (vfQuit)
+    return;
   if (!fReshaped)
     return; // pixelSize[] not yet defined
 
@@ -1169,6 +1170,8 @@ void drag(const int x, const int y)
 
 void mouse(const int button, const int state, const int x, const int y)
 {
+  if (vfQuit)
+    return;
   if (!fReshaped)
     return; // pixelSize[] not yet defined
 
@@ -1298,6 +1301,8 @@ void drawTicks()
 
 void reshape(int w, int h)
 {
+  if (vfQuit)
+    return;
 #ifdef making_movie
   w = 1280;
   h = 720;
@@ -1490,6 +1495,8 @@ void movieSaveFrame()
 
 void drawAll()
 {
+  if (vfQuit)
+    return;
   if (!fReshaped) {
     // Still starting up.  Window manager hasn't set the window size yet.
     return;
@@ -1561,7 +1568,6 @@ void drawAll()
   glutSwapBuffers();
   aim();
 }
-
 
 void makeTextureNoise()
 {
@@ -1757,6 +1763,7 @@ int main(int argc, char** argv)
   tAim[0] = tShow[0] = tShowBound[0] = 0.0;
   tAim[1] = tShow[1] = tShowBound[1] = wavcsamp / double(SR);
 
+  glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
   glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
   glutInitWindowSize(pixelSize[0], pixelSize[1]);
   glutCreateWindow("Timeliner");
@@ -1785,6 +1792,8 @@ int main(int argc, char** argv)
     Feature* f = new Feature(-1, filename, dirMarshal);
     if (f->fValid())
       features.push_back(f);
+    else
+      delete f;
   }
   if (features.empty()) {
     warn("No HTK features");
@@ -1820,5 +1829,6 @@ int main(int argc, char** argv)
 	Quit              : ctrl+C\n\n");
 
   glutMainLoop();
+  for (const auto f: features) delete f;
   return 0;
 }
