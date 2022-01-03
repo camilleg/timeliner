@@ -1,4 +1,5 @@
-CFLAGS := -std=c++17 -O3 -Wall -ffast-math -fexpensive-optimizations -fomit-frame-pointer -maccumulate-outgoing-args -pedantic
+MAKEFLAGS += --jobs=99
+CFLAGS := -std=c++17 -O3 -Wall -Werror -ffast-math -pedantic
 # When compiling on a 32-bit OS, add -D_FILE_OFFSET_BITS=64
 # CFLAGS += -DNDEBUG 
 
@@ -10,7 +11,7 @@ OBJS_RUN = $(OBJS) timeliner_run.o timeliner_util_threads.o timeliner_feature.o 
 OBJS_ALL = $(OBJS_RUN) $(OBJS_PRE)
 
 LIBS_PRE := -lsndfile -lgsl -lgslcblas
-LIBS_RUN := -lasound -lglut -lGLU -lGL -lGLEW -L/usr/X11R6/lib -lXmu -lXi -lXext -lX11 -lsndfile -lpng -lpthread -lrt
+LIBS_RUN := -lsndfile -lasound -lGLEW -lglut -lGLU -lGL -lpng -lpthread
 
 # Optional file containing debugging options for CFLAGS and LIBS_*.
 -include Rules.debug
