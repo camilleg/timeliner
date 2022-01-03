@@ -1,14 +1,12 @@
 MAKEFLAGS += --jobs=99
 CFLAGS := -std=c++17 -O3 -Wall -Werror -ffast-math -pedantic
-# When compiling on a 32-bit OS, add -D_FILE_OFFSET_BITS=64
+# On a 32-bit OS, CFLAGS += -D_FILE_OFFSET_BITS=64
 # CFLAGS += -DNDEBUG 
-
-HDRS = timeliner_diagnostics.h timeliner_cache.h timeliner_util.h timeliner_util_threads.h timeliner_feature.h
 
 OBJS     = timeliner_util.o timeliner_diagnostics.o timeliner_cache.o
 OBJS_PRE = $(OBJS) timeliner_pre.o
 OBJS_RUN = $(OBJS) timeliner_run.o timeliner_util_threads.o timeliner_feature.o alsa.o
-OBJS_ALL = $(OBJS_RUN) $(OBJS_PRE)
+OBJS_ALL = $(sort $(OBJS_RUN) $(OBJS_PRE))
 
 LIBS_PRE := -lsndfile -lgsl -lgslcblas
 LIBS_RUN := -lsndfile -lasound -lGLEW -lglut -lGLU -lGL -lpng -lpthread
@@ -17,12 +15,6 @@ LIBS_RUN := -lsndfile -lasound -lGLEW -lglut -lGLU -lGL -lpng -lpthread
 -include Rules.debug
 
 all: test-mono
-
-clean:
-	rm -f timeliner_run timeliner_prp $(OBJS_ALL) timeliner.log
-
-.cpp.o: $(HDRS)
-	g++ $(CFLAGS) -c $<
 
 timeliner_run: $(OBJS_RUN)
 	g++ $(CFLAGS) -o $@ $(OBJS_RUN) $(LIBS_RUN)
@@ -58,3 +50,14 @@ example/farm/marshal/mixed.wav: example/farm/config.txt
 	cd example && ../timeliner_prp farm/marshal farm/config.txt
 	# Cicadas, then bats (ultrasonic mic), then robins and cardinals and other songbirds.
 	# HCopy takes 9 minutes.
+
+DEPENDFLAGS = -MMD -MT $@ -MF $(patsubst %.o,.depend/%.d,$@)
+%.o: %.cpp
+	@mkdir -p .depend
+	g++ $(CFLAGS) $(DEPENDFLAGS) -c $<
+-include $(patsubst %.o,.depend/%.d,$(OBJS_ALL))
+
+clean:
+	rm -rf timeliner_run timeliner_prp $(OBJS_ALL) .depend timeliner.log
+
+.PHONY: all clean test-mono test-stereo test-openhouse test-EEG test-farm
