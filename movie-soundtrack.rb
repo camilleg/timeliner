@@ -5,7 +5,7 @@
 Src = 'example/mono/marshal/mixed.wav'
 SR = 16000
 
-s = `grep ^# timeliner-recording.txt` .split /\n/
+s = `grep ^# timeliner-recording.txt`.split(/\n/)
 cFrame = `grep -v ^# timeliner-recording.txt|wc -l`.to_i
 
 def tmp(i) "/run/shm/timeliner/tmp#{i}.wav" end
