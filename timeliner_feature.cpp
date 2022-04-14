@@ -209,11 +209,13 @@ const void Feature::makeTextureMipmap(const CHello& cacheHTK, const int mipmaple
 
   //if (mipmaplevel<3) printf("    Computing %d mipmaps of width %d.\n", cchunk, width);
   //printf("vectorsize %d\n", vectorsize());
+#if 1
+  for (int ichunk=0; ichunk<cchunk; ++ichunk) {
+    pool->task(new WorkerArgs(*this, cacheHTK, mipmaplevel, width, ichunk));
+  }
+#else
   unsigned char* bufByte = new unsigned char[vectorsize()*width];
   for (int ichunk=0; ichunk<cchunk; ++ichunk) {
-#if 1
-    pool->task(new WorkerArgs(*this, cacheHTK, mipmaplevel, width, ichunk));
-#else
     const double chunkL = ichunk     / double(cchunk); // e.g., 5/8
     const double chunkR = (ichunk+1) / double(cchunk); // e.g., 6/8
   printf("makeTextureMipmapChunk 0, vectorsize %d\n", vectorsize());
@@ -226,7 +228,7 @@ const void Feature::makeTextureMipmap(const CHello& cacheHTK, const int mipmaple
       glBindTexture(GL_TEXTURE_1D, rgTex[ichunk].tex[j]);
       glTexImage1D(GL_TEXTURE_1D, mipmaplevel, GL_INTENSITY8, width, 0, GL_RED, GL_UNSIGNED_BYTE, bufByte + width*j);
     }
-#endif
   }
   delete [] bufByte;
+#endif
 }
