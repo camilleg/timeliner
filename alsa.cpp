@@ -42,12 +42,12 @@ void emit_samples(const snd_pcm_channel_area_t *areas,
     unsigned int chn;
     for (chn = 0; chn < channels; chn++) {
         if ((areas[chn].first % 8) != 0) {
-            printf("areas[%i].first == %i, aborting...\n", chn, areas[chn].first);
+            printf("areas[%u].first == %u, aborting...\n", chn, areas[chn].first);
             exit(EXIT_FAILURE);
         }
         samples[chn] = /*(signed short *)*/(((unsigned char *)areas[chn].addr) + (areas[chn].first / 8));
         if ((areas[chn].step % 16) != 0) {
-            printf("areas[%i].step == %i, aborting...\n", chn, areas[chn].step);
+            printf("areas[%u].step == %u, aborting...\n", chn, areas[chn].step);
             exit(EXIT_FAILURE);
         }
         steps[chn] = areas[chn].step / 8;
@@ -133,7 +133,7 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_
     /* set the period time */
     err = snd_pcm_hw_params_set_period_time_near(handle, params, &period_time, &dir);
     if (err < 0) {
-        printf("Unable to set period time %i for playback: %s\n", period_time, snd_strerror(err));
+        printf("Unable to set period time %u for playback: %s\n", period_time, snd_strerror(err));
         return err;
     }
     err = snd_pcm_hw_params_get_period_size(params, &size, &dir);
@@ -242,9 +242,9 @@ void alsaInit(const unsigned SR)
         return;
     }
     if (SR != rate)
-      printf("timeliner ALSA Warning: ALSA playback overriding requested sample rate of %d Hz with hardcoded %d Hz.\n", SR, rate);
+      printf("timeliner ALSA Warning: ALSA playback overriding requested sample rate of %u Hz with hardcoded %u Hz.\n", SR, rate);
     printf("timeliner ALSA Playback device is %s\n", device);
-    printf("Stream parameters are %iHz, %s, %i channels\n", rate, snd_pcm_format_name(format), channels);
+    printf("Stream parameters are %u Hz, %s, %u channels\n", rate, snd_pcm_format_name(format), channels);
     if ((err = snd_pcm_open(&handle, device, SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
         printf("timeliner ALSA Playback open error: %s\n", snd_strerror(err));
         return;
