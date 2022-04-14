@@ -190,7 +190,7 @@ int visSamples = 0;
 
 class S2Splay {
 public:
-  S2Splay() : _sPlay(-1.0), _tPlay(appnow()), _fPlaying(false), _sampBgn(10000) {}
+  S2Splay() : _sPlay(-1.0), _sPlayPrev(-1.0), _tPlay(appnow()), _fPlaying(false), _sampBgn(10000) {}
   bool playing() const { arGuard _(_lock); return _fPlaying; }
   void soundpause() { arGuard _(_lock); _fPlaying = false; }
 
@@ -691,6 +691,7 @@ public:
   Flash(double fadeFrames=20.0):
     _fadeStep(1.0/fadeFrames), _t(-1.0) {
     memset(_color, 0, sizeof(_color));
+    memset(_colorFaded, 0, sizeof(_colorFaded));
   };
   void blink(const double t, const float r, const float g, const float b) {
     _t = t;
@@ -1376,11 +1377,13 @@ bool screenshot(const char* filename)
   png_structp pPNG = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
   if (!pPNG) {
     warn("screenshot problem 1");
+    fclose(fp);
     return false;
   }
   png_infop pInfoPNG = png_create_info_struct(pPNG);
   if (!pInfoPNG) {
     warn("screenshot problem 2");
+    fclose(fp);
     return false;
   }
   png_init_io(pPNG, fp);
@@ -1808,9 +1811,8 @@ int main(int argc, char** argv)
   prepTexture(texNoise);
   makeTextureNoise();
 #ifdef _MSC_VER
-  unsigned long idDummy;
-  idDummy = _beginthread(samplereader, 0, NULL);
-  idDummy = _beginthread(samplewriter, 0, NULL);
+  (void)_beginthread(samplereader, 0, NULL);
+  (void)_beginthread(samplewriter, 0, NULL);
   // todo: if (_threadID == (unsigned long)(-1L)) ...
 #else
   pthread_t idDummy;
