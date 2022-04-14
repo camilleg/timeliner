@@ -108,7 +108,7 @@ void Feature::makeMipmaps() {
   if (subsample < 1)
     subsample = 1;
   if (subsample > 1)
-    printf("Subsampling %dx from environment variable timeliner_zoom.\n", subsample);
+    printf("Subsampling %ux from environment variable timeliner_zoom.\n", subsample);
 
   const int csample = samples();
 
@@ -125,7 +125,7 @@ void Feature::makeMipmaps() {
     assert(widthLim >= 0); // because width is unsigned
     if (width > unsigned(widthLim)) assert(width%widthLim==0);	// everything is a power of two
     cchunk = width<unsigned(widthLim) ? 1 : width/widthLim;
-    //printf("width = %d, cchunk = %d, widthLim = %d\n", width, cchunk, widthLim);
+    //printf("width = %u, cchunk = %d, widthLim = %d\n", width, cchunk, widthLim);
     if (width >= unsigned(widthLim))
       assert(GLint(width/cchunk) == widthLim);
   }

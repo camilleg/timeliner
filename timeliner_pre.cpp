@@ -748,7 +748,7 @@ int mainCore(int argc, char** argv)
 
     // Interleave samples, from within each Record, into wavsamples[].
     for (long irecord=0; irecord<numRecords; ++irecord) {
-      if (irecord % 20 == 0) printf("Record %6ld of %6ld expects %ld shorts as %d sequences of %d.\n", irecord, numRecords, shortsPerRecord, channels, samplesPerRecord);
+      if (irecord % 20 == 0) printf("Record %6ld of %6ld expects %ld shorts as %u sequences of %d.\n", irecord, numRecords, shortsPerRecord, channels, samplesPerRecord);
       const short* psRecord = ps + irecord*shortsPerRecord;
       for (int chan = 0; chan < channels_fake; ++chan)
 	std::copy(
