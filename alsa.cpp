@@ -102,7 +102,7 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_
     /* set the count of channels */
     err = snd_pcm_hw_params_set_channels(handle, params, channels);
     if (err < 0) {
-        printf("Channels count (%i) not available for playbacks: %s\n", channels, snd_strerror(err));
+        printf("Channels count (%u) not available for playbacks: %s\n", channels, snd_strerror(err));
         return err;
     }
     /* set the stream rate */
@@ -120,7 +120,7 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_
     int dir = 0;
     err = snd_pcm_hw_params_set_buffer_time_near(handle, params, &buffer_time, &dir);
     if (err < 0) {
-        printf("Unable to set buffer time %i for playback: %s\n", buffer_time, snd_strerror(err));
+        printf("Unable to set buffer time %u for playback: %s\n", buffer_time, snd_strerror(err));
         return err;
     }
     snd_pcm_uframes_t size = 0;
