@@ -55,8 +55,8 @@ Within that solution, in each project, rightclick Properties;
             (This is smarter than copying `*.lib` and `*.h` into the Timeliner project.)  
             (Beware the different directories `Program Files` and `Program Files (x86)`.)
     -   In Debugging, for Command Arguments specify:
-    	-   for project `timeliner_pre`, a marshal dir and a config file, e.g. `example\stereo\marshal example\stereo\config.txt`.
-    	-   for project `timeliner`, a marshal dir, e.g. `example\stereo\marshal`.
+        -   for project `timeliner_pre`, a marshal dir and a config file, e.g. `example\stereo\marshal example\stereo\config.txt`.
+        -   for project `timeliner`, a marshal dir, e.g. `example\stereo\marshal`.
 
 Build the debug and/or release versions of projects `timeliner_pre` and `timeliner`.
 
