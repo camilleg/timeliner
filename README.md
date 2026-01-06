@@ -4,9 +4,9 @@ A browser for long audio recordings.
 
 1-minute [example video](http://vimeo.com/88076447).
 
-6-page [description](http://zx81.isl.uiuc.edu/camilleg/acmmm12.pdf).
+6-page [description](http://camille-g.com/acmmm12.pdf).
 
-News story giving [historical context](http://www.ece.illinois.edu/mediacenter/article.asp?id=7568).
+News story giving [historical context](https://web.archive.org/web/20140808234326/http://www.ece.illinois.edu/mediacenter/article.asp?id=7568).
 
 <!-- Ubuntu 18.04 needs at least libglew-dev libxmu-dev -->
 
